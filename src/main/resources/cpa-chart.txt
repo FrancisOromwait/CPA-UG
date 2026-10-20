@@ -1,0 +1,130 @@
+# CPA Uganda chart of accounts, from the client's INIT.xlsx. code|name|type|parent code|system (Y/N)
+1110|Loan Process Fees|INCOME||Y
+1120|Loan Application Fees|INCOME||Y
+1130|Loan Interest Income|INCOME||Y
+1140|LOAN PENALTY Income|INCOME||Y
+1150|Savings Withdraw Fee|INCOME||Y
+1160|Mandatory savings penalty|INCOME||N
+1210|MemberShip Fee|INCOME||Y
+1220|Annual Subscription|INCOME||Y
+1230|Loan Security Fee|INCOME||Y
+1310|Bank Interest Income|INCOME||N
+1320|Investment Income|INCOME||N
+1325|UAP Investment Income|INCOME||N
+1326|Treasury Bond Income|INCOME||N
+1327|SANLAM Investment Income|INCOME||N
+1330|Stationery Fees|EXPENSE||Y
+1334|Profit on sale of bags|INCOME||N
+1335|Bag sale|INCOME||N
+1340|Other Incomes|INCOME||N
+1344|Profit on T.shirt Sale|INCOME||N
+1345|T.shirt sale|INCOME||N
+1350|Legal Charges|INCOME||Y
+1360|Stamp Duty logbooks|INCOME||Y
+1365|CPA SACCO Event Income|INCOME||N
+2008|Trade and Other Receivables|ASSET||N
+2100|Employee Expenses|EXPENSE||N
+2110|SALARIES|EXPENSE|2100|N
+2114|Fair Value Loss on shares|EXPENSE||N
+2120|NSSF|EXPENSE|2100|N
+2130|Staff Training|EXPENSE|2100|N
+2140|Staff Bonus|EXPENSE|2100|N
+2150|Medical Insurance|EXPENSE|2100|N
+2160|Transport Allowance|EXPENSE|2100|N
+2170|Housing Allowance|EXPENSE|2100|N
+2180|Retirement Benefit Contribution|EXPENSE|2100|N
+2190|Subscription to professional Body|EXPENSE|2100|N
+2200|Administrative Expenses|EXPENSE||N
+2201|Meeting Expenses|EXPENSE|2200|N
+2202|Fair value Adjustment|EXPENSE|2200|N
+2203|ECL Expected Credit Loss provision|EXPENSE||N
+2204|Writte Offs|EXPENSE|2200|N
+2205|UCSCU Annual Subscription|EXPENSE|2200|N
+2207|Other Admin Expesense|EXPENSE|2200|N
+2210|Amortization Expense|EXPENSE|2200|N
+2215|BAG PURCHASE|EXPENSE||N
+2220|Legal Fees|EXPENSE|2200|N
+2225|T.SHIRT PURCHASE|EXPENSE||N
+2230|Stationary|EXPENSE|2200|N
+2235|ICPAU Utilities Cost|EXPENSE|2200|N
+2240|Rent and Rates|EXPENSE|2200|N
+2245|Audit Fees|EXPENSE|2200|N
+2250|Office Trasnport and other running costs|EXPENSE|2200|N
+2255|Condolence Contribution|EXPENSE|2200|N
+2260|Repair and Maintenance|EXPENSE|2200|N
+2265|Website Hosting|EXPENSE|2200|N
+2270|Communication Expenses|EXPENSE|2200|N
+2280|Bank Charges|EXPENSE|2200|N
+2285|Depreciation Expense|EXPENSE|2200|N
+2290|Consultation l Fees|EXPENSE|2200|N
+2295|MIS Update & Annual Subscription|EXPENSE|2200|N
+2300|Governance and Statutory Expenses|EXPENSE||N
+2305|AGM/SGM Meeting cost|EXPENSE|2300|N
+2310|Tax Expenses|EXPENSE||N
+2315|Annual Report Cost|EXPENSE|2300|N
+2320|Members Training Cost|EXPENSE|2300|N
+2325|Board Retreat|EXPENSE|2300|N
+2330|Board trainings|EXPENSE|2300|N
+2335|Board Recognition|EXPENSE|2300|N
+2390|BOD Meeting Expenses|EXPENSE|2200|N
+2410|Interest and Finance Charges|EXPENSE||N
+2440|Shares Distribution Expense|EXPENSE||Y
+2510|Savings Interest Expense|EXPENSE||Y
+2540|Loan Insurance Expense|EXPENSE||Y
+2550|DIVIDEND|EXPENSE||N
+2570|Temporary System A/C|EXPENSE||Y
+3010|Petty cash|ASSET||N
+3020|Cash at Hand|ASSET||N
+3030|Funds in Transit|ASSET||N
+3040|Centenary Savings Account|ASSET||N
+3042|Housing Finance Bank|ASSET||N
+3044|Airtel Collection Account|ASSET||N
+3046|MTN Collection Account|ASSET||N
+3048|Centenary Current Account|ASSET||N
+3050|UAP UMBRELLA TRUST FUND|ASSET||N
+3051|Treasury Bond Investment|ASSET||N
+3052|SANLAM UNIT TRUST|ASSET||N
+3055|Data Load A/C|ASSET||N
+3230|Deferred Taxation|LIABILITY||N
+3310|Write Off|ASSET||N
+3320|Fixed ASSETS|ASSET||N
+3330|Investment UCSCU|ASSET||N
+3340|Intangible Assets|ASSET||N
+3350|Accumulated Depreciation|ASSET||N
+3360|Accumulated amortisation|ASSET||N
+3370|Investment in CIC Insurance|ASSET||N
+3400|INVENTORY|ASSET||N
+3500|Loans|ASSET||Y
+3550|LOAN LOSS PROVISION|ASSET||N
+3700|Loan Interest Receivable|ASSET||Y
+3720|Short term investment|ASSET||N
+3750|Invetment income receivable|ASSET||N
+3770|tax refund receivable|ASSET||N
+4110|Shares|EQUITY||Y
+4115|CPA SACCO SHARES|EQUITY||N
+4120|Share transfer reserve fund|EQUITY||N
+4130|Development reserve fund|EQUITY||N
+4140|Education reserve fund|EQUITY||N
+4145|Statutory Reserve Fund|EQUITY||N
+4150|share Premium A/C|EQUITY||Y
+4160|Retained Earnings|EQUITY||Y
+5105|Accruals and Payables|LIABILITY||N
+5110|Optional Savings|LIABILITY||Y
+5115|Compulsory Savings|LIABILITY||Y
+5120|Fixed Deposit Savings|LIABILITY||Y
+5125|Unknown funds Deposits|LIABILITY||N
+5130|Insurance Liability|LIABILITY||Y
+5135|Deferred tax|LIABILITY||N
+5140|Tax Due|LIABILITY||N
+5145|Loans Acquired / Payable|LIABILITY||N
+5150|Savings Interest Liability|LIABILITY||Y
+5155|ACCRUED EXPENSES|LIABILITY||N
+5160|Divident Payable|LIABILITY||N
+5175|W/H Tax Payable|LIABILITY||Y
+5180|Bereavement Fund|LIABILITY||Y
+5550|Advance|ASSET||N
+5560|Penalty Receivable|ASSET||Y
+5570|Shares Due/Receivable|ASSET||Y
+5580|MemberShip Dues|ASSET||Y
+9900|X-Rate Gain/Loss|EXPENSE||Y
+9991|MULTI JOURNAL CONTROL A/C|EXPENSE||Y

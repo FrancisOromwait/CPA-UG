@@ -1,0 +1,14 @@
+# Build output
+target/
+
+# Database backups and client data (member records): never put these on GitHub
+backups/
+DOCS/
+*.sql
+*.xlsx
+*.csv
+
+# Editor files
+.idea/
+.vscode/
+*.iml

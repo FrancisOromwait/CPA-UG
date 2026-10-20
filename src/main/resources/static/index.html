@@ -1,0 +1,60 @@
+<!doctype html>
+<html lang="en">
+<head>
+  <meta charset="utf-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1">
+  <title>CPA Uganda</title>
+  <link rel="stylesheet" href="/style.css">
+  <link rel="icon" href="data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 32 32'%3E%3Crect width='32' height='32' rx='8' fill='%231d4ed8'/%3E%3Cpath d='M8 21l5-6 4 4 7-9' stroke='white' stroke-width='3' fill='none' stroke-linecap='round' stroke-linejoin='round'/%3E%3C/svg%3E">
+</head>
+<body>
+
+<!-- LOGIN -->
+<main id="login" class="login-wrap" hidden>
+  <div class="login-card">
+    <div class="brand-mark" id="loginMark"></div>
+    <h1 id="loginTitle">CPA Uganda</h1>
+    <p class="muted" id="loginSub">Sign in to continue.</p>
+    <form id="loginForm" autocomplete="on">
+      <label>Sacco branch
+        <select name="branch" id="loginBranch" required>
+          <option value="">Loading branches…</option>
+        </select>
+      </label>
+      <label>Username
+        <input name="username" autocomplete="username" required autofocus>
+      </label>
+      <label>Password
+        <input name="password" type="password" autocomplete="current-password" required>
+      </label>
+      <div id="loginError" class="error" role="alert" hidden></div>
+      <button class="btn primary block" type="submit">Sign in</button>
+    </form>
+  </div>
+</main>
+
+<!-- APP -->
+<div id="app" class="shell" hidden>
+  <aside class="side">
+    <div class="side-brand">
+      <span id="brandMark"></span>
+      <span id="brandName">CPA Uganda</span>
+    </div>
+    <nav id="nav"></nav>
+    <div class="side-foot">
+      <div id="who"></div>
+      <button class="btn ghost small" id="chpw">Change password</button>
+      <button class="btn ghost small" id="logout">Sign out</button>
+    </div>
+  </aside>
+  <section class="main">
+    <header class="top"><h2 id="title"></h2><span id="scope" class="pill"></span></header>
+    <div id="view"></div>
+  </section>
+</div>
+
+<div id="modalRoot"></div>
+<div id="toast" class="toast" hidden></div>
+<script src="/app.js"></script>
+</body>
+</html>
