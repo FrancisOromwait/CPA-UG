@@ -220,15 +220,17 @@ const REPORT_KIDS = [['reports/trial-balance', 'Trial balance'], ['reports/incom
 const NAV_ADMIN = [
   ['dashboard', 'Dashboard'],
   ['f-members', 'Members', [['members', 'Member list']]],
-  ['f-deposits', 'Deposits', [['deposits', 'Regular deposit'], ['withdrawals', 'Savings withdrawal'], ['savingsinterest', 'Savings interest'], ['payroll', 'Payroll deductions'], ['payrollpaste', 'Payroll from Excel']]],
+  ['f-deposits', 'Deposits', [['deposits', 'Regular deposit'], ['payroll', 'Payroll deductions'], ['payrollpaste', 'Payroll from Excel']]],
+  ['f-savings', 'Savings', [['withdrawals', 'Savings withdrawal'], ['savingsinterest', 'Savings interest']]],
   ['f-loans', 'Loans', [['loans', 'Loan applications'], ['interest', 'Interest computation']]],
   ['f-accounting', 'Accounting', [['accounts', 'Chart of accounts'], ['products', 'Products'], ['journals', 'Journal entries'], ['gl', 'General ledger'], ['audit', 'Audit trail']]],
   ['f-reports', 'Reports', REPORT_KIDS]
 ];
-/* a branch admin also gets the staff screen; treasurers and cashiers have the plain branch menu */
+/* a branch admin also gets the staff screen (just before Accounting); treasurers and cashiers have the plain branch menu */
+const ACC_AT = NAV_ADMIN.findIndex(([k]) => k === 'f-accounting');
 const navFor = () => isMember() ? [['mystatement', 'My statement']]
   : isMgr() ? NAV_MANAGER
-  : isBranchAdmin() ? [...NAV_ADMIN.slice(0, 4), ['f-staff', 'Administration', [['staff', 'Staff users'], ...(S.single ? [['momo', 'Mobile money numbers']] : [])]], ...NAV_ADMIN.slice(4)]
+  : isBranchAdmin() ? [...NAV_ADMIN.slice(0, ACC_AT), ['f-staff', 'Administration', [['staff', 'Staff users'], ...(S.single ? [['momo', 'Mobile money numbers']] : [])]], ...NAV_ADMIN.slice(ACC_AT)]
   : NAV_ADMIN;
 const NAV_MANAGER = [
   ['dashboard', 'Dashboard'],
