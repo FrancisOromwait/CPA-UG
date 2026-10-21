@@ -1,0 +1,7 @@
+target/
+backups/
+DOCS/
+.git/
+*.sql
+*.xlsx
+*.csv
