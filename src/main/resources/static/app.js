@@ -509,9 +509,9 @@ views.statement = async (el, id) => {
     const canEdit = !isMgr();
     $('#photoBox').innerHTML = (url ? `<img class="photo" src="${url}" alt="Photo of ${esc(m.fullName)}">` : '<div class="no-photo">No photo</div>') +
       (!canEdit ? '' : `<input type="file" accept="image/*" id="photoFile" hidden><input type="file" accept="image/*" capture="user" id="photoCam" hidden>` +
-        `<button type="button" class="btn small" id="photoPick">${url ? 'Change photo' : 'Add photo'}</button>` +
+        `<div class="photo-btns"><button type="button" class="btn small" id="photoPick">${url ? 'Change photo' : 'Add photo'}</button>` +
         `<button type="button" class="btn small" id="photoTake">Take photo</button>` +
-        (url ? `<button type="button" class="btn small danger" id="photoDel">Remove</button>` : ''));
+        (url ? `<button type="button" class="btn small danger" id="photoDel">Remove</button>` : '') + `</div>`);
     if (!canEdit) return;
     const upload = async file => {
       if (!file) return;

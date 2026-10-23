@@ -6,6 +6,7 @@ import com.estates.sacco.service.ReportDoc.Section;
 import com.lowagie.text.*;
 import com.lowagie.text.pdf.PdfPCell;
 import com.lowagie.text.pdf.PdfPTable;
+import com.lowagie.text.pdf.PdfTemplate;
 import com.lowagie.text.pdf.PdfWriter;
 import org.springframework.http.HttpStatus;
 import org.springframework.stereotype.Service;
@@ -15,7 +16,6 @@ import java.awt.Color;
 import java.io.ByteArrayOutputStream;
 import java.time.LocalDateTime;
 import java.time.format.DateTimeFormatter;
-import java.util.ArrayList;
 import java.util.List;
 import java.util.Locale;
 
@@ -36,7 +36,7 @@ public class PdfReportService {
         return render(doc, generatedBy, null);
     }
 
-    /** {@code photo}: a JPEG shown at the top right, beside the heading (the member's photo on their statement), or null for none. */
+    /** {@code photo}: a JPEG shown round, in the middle above the heading (the member's photo on their statement), or null for none. */
     public byte[] render(ReportDoc doc, String generatedBy, byte[] photo) {
         ByteArrayOutputStream out = new ByteArrayOutputStream();
         // the member statement has a column for every kind of account, so it is printed wide with a line round every cell;
@@ -45,7 +45,7 @@ public class PdfReportService {
         boolean wide = grid || "Member Summary".equals(doc.title());
         Document d = new Document(wide ? PageSize.A4.rotate() : PageSize.A4, 36, 36, 40, 50);
         try {
-            PdfWriter.getInstance(d, out);
+            PdfWriter writer = PdfWriter.getInstance(d, out);
             String stamp = LocalDateTime.now().format(DateTimeFormatter.ofPattern("dd MMM yyyy HH:mm", Locale.ENGLISH));
             HeaderFooter footer = new HeaderFooter(new Phrase("Generated " + stamp + " by " + generatedBy + "   |   Page ",
                     font(Font.NORMAL, 8, Color.GRAY)), true);
@@ -54,33 +54,15 @@ public class PdfReportService {
             d.setFooter(footer);
             d.open();
 
-            List<Element> heading = new ArrayList<>();
-            heading.add(new Paragraph(settings.getAppName(), font(Font.BOLD, 9, Color.GRAY)));
+            Image picture = roundPicture(writer, photo);
+            if (picture != null) d.add(picture);
+            d.add(new Paragraph(settings.getAppName(), font(Font.BOLD, 9, Color.GRAY)));
             Paragraph title = new Paragraph(doc.title(), font(Font.BOLD, 18, BRAND));
             title.setSpacingBefore(2);
-            heading.add(title);
-            heading.add(new Paragraph(doc.branchLine(), font(Font.BOLD, 12, Color.BLACK)));
-            if (doc.subjectLine() != null) heading.add(new Paragraph(doc.subjectLine(), font(Font.NORMAL, 11, Color.BLACK)));
-            heading.add(new Paragraph(doc.periodLine(), font(Font.NORMAL, 10, Color.DARK_GRAY)));
-            Image picture = picture(photo);
-            if (picture == null) {
-                for (Element e : heading) d.add(e);
-            } else {
-                // the heading on the left, the photo on the right
-                PdfPTable head = new PdfPTable(2);
-                head.setWidthPercentage(100);
-                head.setWidths(new float[] {5f, 1.3f});
-                PdfPCell left = new PdfPCell();
-                left.setBorder(Rectangle.NO_BORDER);
-                for (Element e : heading) left.addElement(e);
-                PdfPCell right = new PdfPCell(picture, false);
-                right.setBorder(Rectangle.NO_BORDER);
-                right.setHorizontalAlignment(Element.ALIGN_RIGHT);
-                right.setVerticalAlignment(Element.ALIGN_TOP);
-                head.addCell(left);
-                head.addCell(right);
-                d.add(head);
-            }
+            d.add(title);
+            d.add(new Paragraph(doc.branchLine(), font(Font.BOLD, 12, Color.BLACK)));
+            if (doc.subjectLine() != null) d.add(new Paragraph(doc.subjectLine(), font(Font.NORMAL, 11, Color.BLACK)));
+            d.add(new Paragraph(doc.periodLine(), font(Font.NORMAL, 10, Color.DARK_GRAY)));
 
             if (!doc.totals().isEmpty()) d.add(totalsBox(doc.totals()));
             if (doc.note() != null) {
@@ -97,13 +79,30 @@ public class PdfReportService {
         return out.toByteArray();
     }
 
-    /** The photo at most 85 points a side, or null when there is none or it cannot be read (the PDF is then made without it). */
-    private static Image picture(byte[] photo) {
+    /**
+     * The photo cut to a circle with a thin blue ring, 80 points across and placed in the middle of the page. The picture fills the
+     * circle (its middle is kept when it is not square). Null when there is none or it cannot be read (the PDF is made without it).
+     */
+    private static Image roundPicture(PdfWriter writer, byte[] photo) {
         if (photo == null) return null;
         try {
             Image img = Image.getInstance(photo);
-            img.scaleToFit(85, 85);
-            return img;
+            float size = 80f, r = size / 2;
+            float scale = size / Math.min(img.getWidth(), img.getHeight());
+            float w = img.getWidth() * scale, h = img.getHeight() * scale;
+            PdfTemplate t = writer.getDirectContent().createTemplate(size, size);
+            t.circle(r, r, r);
+            t.clip();
+            t.newPath();
+            t.addImage(img, w, 0, 0, h, (size - w) / 2, (size - h) / 2);
+            t.setColorStroke(BRAND);
+            t.setLineWidth(2.5f);
+            t.circle(r, r, r - 1.25f);
+            t.stroke();
+            Image round = Image.getInstance(t);
+            round.setAlignment(Element.ALIGN_CENTER);
+            round.setSpacingAfter(6);
+            return round;
         } catch (Exception e) {
             return null;
         }
