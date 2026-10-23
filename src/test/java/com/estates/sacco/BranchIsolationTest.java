@@ -959,5 +959,23 @@ class BranchIsolationTest {
         for (JsonNode g : send(manager, "GET", "/api/general-ledger?branchId=" + b, null, 200)) {
             if (g.hasNonNull("entryId")) send(adminA, "GET", "/api/entries/" + g.get("entryId").asLong(), null, 403);
         }
+
+        // ================= member summary: every member's line agrees with the closing balances of their own statement =================
+        for (RequestPostProcessor who : new RequestPostProcessor[] {adminA, adminB}) {
+            java.util.Map<String, Long> ids = new java.util.HashMap<>();
+            for (JsonNode m : send(who, "GET", "/api/members", null, 200)) ids.put(m.get("memberNo").asText(), m.get("id").asLong());
+            JsonNode summaryRows = send(who, "GET", "/api/reports/member-summary", null, 200).get("sections").get(0).get("rows");
+            assertEquals(ids.size(), summaryRows.size());
+            for (JsonNode row : summaryRows) {
+                JsonNode own = send(who, "GET", "/api/reports/member-statement?memberId=" + ids.get(row.get(0).asText()), null, 200);
+                for (int i = 2; i < 8; i++) {
+                    String expected = own.get("sections").isEmpty() ? "0.00" : own.get("sections").get(0).get("totalRow").get(i).asText();
+                    String actual = row.get(i).asText().isEmpty() ? "0.00" : row.get(i).asText();
+                    assertEquals(expected, actual, "member " + row.get(0).asText() + ", column " + i);
+                }
+            }
+        }
+        org.junit.jupiter.api.Assertions.assertTrue(send(manager, "GET", "/api/reports/member-summary", null, 200).get("sections").get(0).get("rows").size() > 0);
+        mvc.perform(get("/api/reports/member-summary/pdf").with(adminA)).andExpect(status().isOk());
     }
 }

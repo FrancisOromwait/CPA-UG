@@ -69,6 +69,9 @@ public class AccountCodes {
     /** Other existing accounts that count as mobile money (comma separated). */
     @Value("${sacco.accounts.mobile-money-also:}")
     private String mobileMoneyAlso;
+    /** The cash and bank accounts the cashbook covers (comma separated; blank: the cash and bank accounts above). Mobile money always counts. */
+    @Value("${sacco.accounts.cashbook:}")
+    private String cashbook;
 
     public String codeFor(Source s) {
         return switch (s) {
@@ -88,13 +91,23 @@ public class AccountCodes {
 
     public boolean isMobileMoney(String code) {
         if (code.equals(mobileMoney)) return true;
-        List<String> also = Arrays.stream(mobileMoneyAlso.split(",")).map(String::trim).filter(s -> !s.isEmpty()).toList();
-        if (also.contains(code)) return true;
+        if (codes(mobileMoneyAlso).contains(code)) return true;
         try {
             int c = Integer.parseInt(code);
             return c >= mobileMoneyFrom && c <= mobileMoneyTo;
         } catch (NumberFormatException e) {
             return false;
         }
+    }
+
+    /** Whether money held on this account is in the cashbook: cash, bank or mobile money. */
+    public boolean isCashbook(String code) {
+        List<String> listed = codes(cashbook);
+        boolean cashOrBank = listed.isEmpty() ? code.equals(cash) || code.equals(bank) : listed.contains(code);
+        return cashOrBank || isMobileMoney(code);
+    }
+
+    private static List<String> codes(String commaSeparated) {
+        return Arrays.stream(commaSeparated.split(",")).map(String::trim).filter(s -> !s.isEmpty()).toList();
     }
 }

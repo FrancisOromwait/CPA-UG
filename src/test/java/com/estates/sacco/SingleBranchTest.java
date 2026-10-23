@@ -98,6 +98,91 @@ class SingleBranchTest {
         assertEquals("CPA Uganda", send(admin, "GET", "/api/reports/member-statement?memberId=" + member, null, 200).get("branchLine").asText());
         send(support, "POST", "/api/transactions", "{\"memberId\":" + member + ",\"type\":\"SAVINGS_DEPOSIT\",\"amount\":1}", 403);   // support only looks
 
+        // the cashbook: the deposit came in as cash from the member; cash then banked by journal is a transfer, not new money
+        JsonNode bookAccounts = send(cashier, "GET", "/api/reports/cashbook-accounts", null, 200);
+        long cashId = 0, bankId = 0;
+        for (JsonNode a : bookAccounts) {
+            if (a.get("code").asText().equals("1100")) cashId = a.get("id").asLong();
+            if (a.get("code").asText().equals("1200")) bankId = a.get("id").asLong();
+        }
+        send(admin, "POST", "/api/journals", "{\"reference\":\"BANKING-1\",\"narration\":\"Cash banked\",\"lines\":["
+                + "{\"accountId\":" + bankId + ",\"debit\":20000},{\"accountId\":" + cashId + ",\"credit\":20000}]}", 201);
+        JsonNode book = send(cashier, "GET", "/api/reports/cashbook-receipts", null, 200);
+        assertEquals("70,000.00", book.get("totals").get(0).get("value").asText());
+        assertEquals("20,000.00", book.get("totals").get(2).get("value").asText());                                   // transfers
+        assertEquals("50,000.00", book.get("totals").get(3).get("value").asText());                                   // from outside
+        JsonNode cashRow = book.get("sections").get(0).get("rows").get(0);
+        assertEquals("M1 - Grace Namuli", cashRow.get(2).asText());
+        JsonNode bankRow = book.get("sections").get(1).get("rows").get(0);
+        assertEquals("BANKING-1", bankRow.get(1).asText());
+        assertEquals(true, bankRow.get(3).asText().startsWith("Transfer from"));
+        JsonNode bankOnly = send(cashier, "GET", "/api/reports/cashbook-receipts?accountId=" + bankId, null, 200);
+        assertEquals(1, bankOnly.get("sections").size());
+
+        // a cashier records other money received (New receipt: a two-line journal); member accounts cannot be used that way
+        long interestIncome = send(admin, "POST", "/api/accounts", "{\"code\":\"4910\",\"name\":\"Bank interest income\",\"type\":\"INCOME\"}", 201).get("id").asLong();
+        send(cashier, "POST", "/api/journals", "{\"reference\":\"RCT-7\",\"narration\":\"Receipt from Stanbic Bank\",\"lines\":["
+                + "{\"accountId\":" + bankId + ",\"description\":\"Stanbic Bank\",\"debit\":3500},"
+                + "{\"accountId\":" + interestIncome + ",\"description\":\"Stanbic Bank\",\"credit\":3500}]}", 201);
+        JsonNode bank = send(cashier, "GET", "/api/reports/cashbook-receipts?accountId=" + bankId, null, 200);
+        JsonNode interestRow = bank.get("sections").get(0).get("rows").get(1);
+        assertEquals("RCT-7", interestRow.get(1).asText());
+        assertEquals("Stanbic Bank", interestRow.get(2).asText());
+        assertEquals("Bank interest income", interestRow.get(3).asText());
+        assertEquals("3,500.00", interestRow.get(4).asText());
+        assertEquals("53,500.00", send(cashier, "GET", "/api/reports/cashbook-receipts", null, 200).get("totals").get(3).get("value").asText());
+        // payments: rent paid from cash (New payment) and the cash that went to the bank, which is a transfer out
+        long rent = send(admin, "POST", "/api/accounts", "{\"code\":\"5610\",\"name\":\"Office rent\",\"type\":\"EXPENSE\"}", 201).get("id").asLong();
+        send(cashier, "POST", "/api/journals", "{\"reference\":\"PV-3\",\"narration\":\"Payment to Landlord\",\"lines\":["
+                + "{\"accountId\":" + rent + ",\"description\":\"Landlord\",\"debit\":15000},"
+                + "{\"accountId\":" + cashId + ",\"description\":\"Landlord\",\"credit\":15000}]}", 201);
+        JsonNode paid = send(cashier, "GET", "/api/reports/cashbook-payments", null, 200);
+        assertEquals("Cashbook Payments", paid.get("title").asText());
+        assertEquals("35,000.00", paid.get("totals").get(0).get("value").asText());
+        assertEquals("20,000.00", paid.get("totals").get(2).get("value").asText());                                   // cash banked
+        assertEquals("15,000.00", paid.get("totals").get(3).get("value").asText());                                   // paid to outside
+        JsonNode cashOut = paid.get("sections").get(0).get("rows");
+        assertEquals(true, cashOut.get(0).get(3).asText().startsWith("Transfer to"));
+        assertEquals("PV-3", cashOut.get(1).get(1).asText());
+        assertEquals("Landlord", cashOut.get(1).get(2).asText());
+        assertEquals("Office rent", cashOut.get(1).get(3).asText());
+
+        long savingsAccount = send(cashier, "GET", "/api/journals/blocked-accounts", null, 200).get(0).asLong();
+        send(cashier, "POST", "/api/journals", "{\"lines\":[{\"accountId\":" + bankId + ",\"debit\":100},"
+                + "{\"accountId\":" + savingsAccount + ",\"credit\":100}]}", 422);
+
+        // messages to members (test mode: prepared and logged, nothing sent); only the administrator sends
+        send(admin, "POST", "/api/members", "{\"memberNo\":\"M2\",\"fullName\":\"Okello,John\",\"phone\":\"0772 123 456 / 0701000000\"}", 201);
+        send(admin, "POST", "/api/members", "{\"memberNo\":\"M3\",\"fullName\":\"Landline Only\",\"phone\":\"041466071\"}", 201);
+        assertEquals(false, send(admin, "GET", "/api/messages/settings", null, 200).get("live").asBoolean());
+        String msg = "{\"audience\":\"ALL\",\"text\":\"Dear {name} ({memberNo}), your savings are UGX {savings}.\"}";
+        JsonNode pre = send(admin, "POST", "/api/messages/preview", msg, 200);
+        assertEquals(3, pre.get("members").asInt());
+        assertEquals(1, pre.get("withNumber").asInt());
+        assertEquals("+256772123456", pre.get("samples").get(0).get("phone").asText());
+        assertEquals("Dear Okello John (M2), your savings are UGX 0.", pre.get("samples").get(0).get("text").asText());
+        assertEquals(2, pre.get("noNumber").size());
+        send(cashier, "POST", "/api/messages", msg, 403);
+        send(support, "POST", "/api/messages", msg, 403);
+        send(cashier, "GET", "/api/messages", null, 403);
+        send(admin, "POST", "/api/messages", "{\"audience\":\"CHOSEN\",\"memberIds\":[" + member + "],\"text\":\"Hello\"}", 400);   // Grace has no phone
+        JsonNode batch = send(admin, "POST", "/api/messages", msg, 201);
+        assertEquals(true, batch.get("testMode").asBoolean());
+        JsonNode detail = null;
+        for (int i = 0; i < 100; i++) {
+            detail = send(support, "GET", "/api/messages/" + batch.get("id").asLong(), null, 200);
+            if (detail.get("batch").get("status").asText().equals("DONE")) break;
+            Thread.sleep(100);
+        }
+        assertEquals("DONE", detail.get("batch").get("status").asText());
+        assertEquals(1, detail.get("batch").get("sent").asInt());
+        assertEquals(2, detail.get("batch").get("failed").asInt());
+        java.util.Map<String, String> result = new java.util.HashMap<>();
+        for (JsonNode r : detail.get("recipients")) result.put(r.get("memberNo").asText(), r.get("status").asText());
+        assertEquals(java.util.Map.of("M1", "NO_NUMBER", "M2", "TEST", "M3", "NO_NUMBER"), result);
+        assertEquals(1, send(support, "GET", "/api/messages", null, 200).size());
+        mvc.perform(get("/api/reports/cashbook-receipts/pdf").with(cashier)).andExpect(status().isOk());
+
         // everyone changes their own password: the current one must be right
         send(admin, "PUT", "/api/me/password", "{\"currentPassword\":\"not-it\",\"password\":\"brand-new-pass\"}", 400);
         send(admin, "PUT", "/api/me/password", "{\"currentPassword\":\"admin-pass-1\",\"password\":\"short\"}", 400);

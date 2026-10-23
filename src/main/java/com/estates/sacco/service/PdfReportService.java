@@ -33,9 +33,11 @@ public class PdfReportService {
 
     public byte[] render(ReportDoc doc, String generatedBy) {
         ByteArrayOutputStream out = new ByteArrayOutputStream();
-        // the member statement has a column for every kind of account, so it is printed wide with a line round every cell
+        // the member statement has a column for every kind of account, so it is printed wide with a line round every cell;
+        // the member summary has the same columns, so it is printed wide too
         boolean grid = "Member Statement".equals(doc.title());
-        Document d = new Document(grid ? PageSize.A4.rotate() : PageSize.A4, 36, 36, 40, 50);
+        boolean wide = grid || "Member Summary".equals(doc.title());
+        Document d = new Document(wide ? PageSize.A4.rotate() : PageSize.A4, 36, 36, 40, 50);
         try {
             PdfWriter.getInstance(d, out);
             String stamp = LocalDateTime.now().format(DateTimeFormatter.ofPattern("dd MMM yyyy HH:mm", Locale.ENGLISH));
@@ -132,6 +134,7 @@ public class PdfReportService {
         if (c.numeric()) return 1.5f;
         return switch (c.name()) {
             case "Account", "Description" -> 3.6f;
+            case "Received from", "Paid to", "Details", "Member" -> 3f;
             case "Code" -> 0.9f;
             case "No" -> 0.6f;
             case "Date" -> 1.4f;

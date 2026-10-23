@@ -43,6 +43,9 @@ public class SecurityConfig {
                 .requestMatchers(HttpMethod.POST, "/api/mobile-money/**").hasAnyRole(chartRoles)
                 .requestMatchers(HttpMethod.PUT, "/api/mobile-money/**").hasAnyRole(chartRoles)
                 .requestMatchers(HttpMethod.DELETE, "/api/mobile-money/**").hasAnyRole(chartRoles)
+                // SMS to members: the branch administrator sends; the manager (support) can look at what was sent
+                .requestMatchers(HttpMethod.POST, "/api/messages/**").hasRole("BRANCH_ADMIN")
+                .requestMatchers("/api/messages/**").hasAnyRole("MANAGER", "BRANCH_ADMIN")
                 .requestMatchers(HttpMethod.POST, "/api/branches/**").hasRole("MANAGER")
                 .requestMatchers(HttpMethod.PUT, "/api/branches/**").hasRole("MANAGER")
                 // Posting transactions: branch admins and their staff (manager is read-only oversight)

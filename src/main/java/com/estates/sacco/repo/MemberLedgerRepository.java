@@ -31,4 +31,12 @@ public interface MemberLedgerRepository extends JpaRepository<MemberLedgerLine, 
         group by m.member.id having sum(m.credit) - sum(m.debit) > 0
         """)
     List<Object[]> savingsInterestOwed(Long branchId, java.time.LocalDate to);
+
+    /** Rows of [memberId, category, transaction type, sum(debit), sum(credit)] up to a date, for one branch or (null) all: the member summary. */
+    @org.springframework.data.jpa.repository.Query("""
+        select m.member.id, m.category, le.type, sum(m.debit), sum(m.credit) from MemberLedgerLine m left join m.ledgerEntry le
+        where (:branchId is null or m.branch.id = :branchId) and m.postedOn <= :to
+        group by m.member.id, m.category, le.type
+        """)
+    List<Object[]> totalsByMember(Long branchId, java.time.LocalDate to);
 }

@@ -216,13 +216,14 @@ $('#chpw').addEventListener('click', () => modal({
 }));
 
 const REPORT_KIDS = [['reports/trial-balance', 'Trial balance'], ['reports/income-expenditure', 'Income & expenditure'],
-  ['reports/balance-sheet', 'Balance sheet'], ['reports/member-statement', 'Member statement']];
+  ['reports/balance-sheet', 'Balance sheet'], ['reports/member-statement', 'Member statement'], ['reports/member-summary', 'Member summary']];
 const NAV_ADMIN = [
   ['dashboard', 'Dashboard'],
   ['f-members', 'Members', [['members', 'Member list']]],
   ['f-deposits', 'Deposits', [['deposits', 'Regular deposit'], ['payroll', 'Payroll deductions'], ['payrollpaste', 'Payroll from Excel']]],
   ['f-savings', 'Savings', [['withdrawals', 'Savings withdrawal'], ['savingsinterest', 'Savings interest']]],
   ['f-loans', 'Loans', [['loans', 'Loan applications'], ['interest', 'Interest computation']]],
+  ['f-cashbook', 'Cashbook', [['reports/cashbook-receipts', 'Receipts'], ['reports/cashbook-payments', 'Payments']]],
   ['f-accounting', 'Accounting', [['accounts', 'Chart of accounts'], ['products', 'Products'], ['journals', 'Journal entries'], ['gl', 'General ledger'], ['audit', 'Audit trail']]],
   ['f-reports', 'Reports', REPORT_KIDS]
 ];
@@ -230,11 +231,11 @@ const NAV_ADMIN = [
 const ACC_AT = NAV_ADMIN.findIndex(([k]) => k === 'f-accounting');
 const navFor = () => isMember() ? [['mystatement', 'My statement']]
   : isMgr() ? NAV_MANAGER
-  : isBranchAdmin() ? [...NAV_ADMIN.slice(0, ACC_AT), ['f-staff', 'Administration', [['staff', 'Staff users'], ...(S.single ? [['momo', 'Mobile money numbers']] : [])]], ...NAV_ADMIN.slice(ACC_AT)]
+  : isBranchAdmin() ? [...NAV_ADMIN.slice(0, ACC_AT), ['f-staff', 'Administration', [['staff', 'Staff users'], ...(S.single ? [['momo', 'Mobile money numbers']] : []), ['messages', 'Messages']]], ...NAV_ADMIN.slice(ACC_AT)]
   : NAV_ADMIN;
 const NAV_MANAGER = [
   ['dashboard', 'Dashboard'],
-  ['f-admin', 'Administration', [['branches', 'Branches'], ['momo', 'Mobile money numbers'], ['yearcodes', 'New year codes'], ['admins', 'Users']]],
+  ['f-admin', 'Administration', [['branches', 'Branches'], ['momo', 'Mobile money numbers'], ['yearcodes', 'New year codes'], ['admins', 'Users'], ['messages', 'Messages']]],
   ...NAV_ADMIN.slice(1)
 ];
 
@@ -262,9 +263,13 @@ const ICONS = {
 ICONS.staff = ICONS.admins;
 ICONS.yearcodes = '<rect x="3" y="4.5" width="18" height="16" rx="2"/><path d="M3 9.5h18M8 3v3M16 3v3M8 14h3M13 14h3M8 17h3"/>';
 ICONS.momo = '<rect x="7" y="2.5" width="10" height="19" rx="2"/><path d="M11 18.5h2M10 6h4"/>';
+ICONS.messages = '<path d="M4 5h16a1 1 0 0 1 1 1v10a1 1 0 0 1-1 1H9l-5 4V6a1 1 0 0 1 1-1z"/><path d="M8 9.5h8M8 13h5"/>';
 ICONS.withdrawals = '<rect x="3" y="7" width="18" height="12" rx="2"/><path d="M12 16V4m0 0l-3.5 3.5M12 4l3.5 3.5"/><circle cx="12" cy="13" r="1.6"/>';
 ICONS.mystatement = ICONS['reports/member-statement'];
+ICONS['reports/member-summary'] = ICONS.members;
 ICONS.savingsinterest = ICONS.interest;
+ICONS['reports/cashbook-receipts'] = '<path d="M4 19.5V5a2 2 0 0 1 2-2h14v15H6a2 2 0 0 0-2 2 2 2 0 0 0 2 2h14v-4"/><path d="M12 6.5v7M9 10.5l3 3 3-3"/>';
+ICONS['reports/cashbook-payments'] = '<path d="M4 19.5V5a2 2 0 0 1 2-2h14v15H6a2 2 0 0 0-2 2 2 2 0 0 0 2 2h14v-4"/><path d="M12 13.5v-7M9 9.5l3-3 3 3"/>';
 const navIcon = k => ICONS[k] ? `<span class="nav-ic"><svg viewBox="0 0 24 24" aria-hidden="true">${ICONS[k]}</svg></span>` : '';
 
 function navHtml(items) {
@@ -292,7 +297,7 @@ function start() {
 
 /* ------------------------------------------------------------------ routing */
 const views = {};
-const TITLES = { yearcodes: 'New year codes', momo: 'Mobile money numbers', withdrawals: 'Savings withdrawal', mystatement: 'My statement', dashboard: 'Dashboard', branches: 'Branches', admins: 'Users', staff: 'Staff users', members: 'Members',
+const TITLES = { messages: 'Messages', yearcodes: 'New year codes', momo: 'Mobile money numbers', withdrawals: 'Savings withdrawal', mystatement: 'My statement', dashboard: 'Dashboard', branches: 'Branches', admins: 'Users', staff: 'Staff users', members: 'Members',
   statement: 'Member statement', loans: 'Loans', payroll: 'Payroll deductions', payrollpaste: 'Payroll from Excel', accounts: 'Chart of accounts', products: 'Product definitions', gl: 'General ledger', reports: 'Reports', deposits: 'Regular deposit', audit: 'Audit trail', journals: 'Journal entries', interest: 'Interest computation', savingsinterest: 'Savings interest' };
 
 async function route() {
@@ -857,7 +862,10 @@ const REPORTS = {
   'trial-balance': { title: 'Trial balance', range: false },
   'income-expenditure': { title: 'Income & expenditure', range: true },
   'balance-sheet': { title: 'Balance sheet', range: false },
-  'member-statement': { title: 'Member statement', range: true }
+  'member-statement': { title: 'Member statement', range: true },
+  'member-summary': { title: 'Member summary', range: false },
+  'cashbook-receipts': { title: 'Cashbook receipts', range: true },
+  'cashbook-payments': { title: 'Cashbook payments', range: true }
 };
 
 function renderDoc(doc) {
@@ -893,22 +901,29 @@ async function pdfUrl(path) {
 views.reports = async (el, kind) => {
   if (!REPORTS[kind]) kind = 'trial-balance';
   const R = REPORTS[kind];
-  const isStatement = kind === 'member-statement';
-  $('#title').textContent = 'Reports · ' + R.title;
+  const isStatement = kind === 'member-statement', isPayments = kind === 'cashbook-payments';
+  const isCashbook = isPayments || kind === 'cashbook-receipts';
+  $('#title').textContent = isCashbook ? (isPayments ? 'Cashbook · Payments' : 'Cashbook · Receipts') : 'Reports · ' + R.title;
   const branches = isMgr() ? await api('/api/branches') : [];
+  const bookAccounts = isCashbook ? await api('/api/reports/cashbook-accounts') : [];
+  // income and expenditure starts at the beginning of the year, the cashbook at the beginning of the month
+  const fromDefault = kind === 'income-expenditure' ? `${new Date().getFullYear()}-01-01` : isCashbook ? today().slice(0, 8) + '01' : '';
   el.innerHTML = `<div class="panel"><form class="toolbar" id="repForm">` +
     (isMgr() ? sel('branchId', 'Branch', branches.map(b => [b.id, `${b.code} – ${b.name}`]),
       isStatement ? { req: 1, blank: 'Select a branch…' } : { blank: 'All branches (consolidated)' }) : '') +
     (isStatement ? sel('memberId', 'Member', [], { req: 1, blank: 'Select a member…' }) : '') +
-    (R.range ? inp('from', 'From', { type: 'date', value: kind === 'income-expenditure' ? `${new Date().getFullYear()}-01-01` : '' }) : '') +
+    (isCashbook ? sel('accountId', 'Account', bookAccounts.map(a => [a.id, `${a.code} – ${a.name}`]), { blank: 'All cash, bank and mobile money' }) : '') +
+    (R.range ? inp('from', 'From', { type: 'date', value: fromDefault }) : '') +
     inp('to', R.range ? 'To' : 'As at', { type: 'date', value: today() }) +
     `<button class="btn primary">View</button><button type="button" class="btn" id="repOpen">Open PDF</button>` +
-    `<button type="button" class="btn" id="repDownload">Download PDF</button></form></div><div id="repOut"></div>`;
+    `<button type="button" class="btn" id="repDownload">Download PDF</button>` +
+    (isCashbook && !isMgr() ? `<button type="button" class="btn primary" id="cashAdd">+ New ${isPayments ? 'payment' : 'receipt'}</button>` : '') +
+    `</form></div><div id="repOut"></div>`;
 
   const form = $('#repForm');
   const query = () => {
     const f = fd(form), qs = new URLSearchParams();
-    ['branchId', 'memberId', 'from', 'to'].forEach(k => { if (f[k]) qs.set(k, f[k]); });
+    ['branchId', 'memberId', 'accountId', 'from', 'to'].forEach(k => { if (f[k]) qs.set(k, f[k]); });
     return qs;
   };
   const run = async () => { $('#repOut').innerHTML = renderDoc(await api(`/api/reports/${kind}?` + query())); };
@@ -927,6 +942,46 @@ views.reports = async (el, kind) => {
   }
 
   form.addEventListener('submit', e => { e.preventDefault(); run().catch(x => toast(x.message, true)); });
+
+  // money in or out that is not a member's: saved as a two-line journal. A receipt debits the account the money came into and
+  // credits what it is for; a payment debits what it is for (an expense...) and credits the account it was paid from.
+  if ($('#cashAdd')) $('#cashAdd').onclick = async () => {
+    try {
+      const [accts, blocked] = await Promise.all([api('/api/accounts'), api('/api/journals/blocked-accounts')]);
+      const bookIds = new Set(bookAccounts.map(a => a.id)), memberAccounts = new Set(blocked);
+      const money = bookAccounts.filter(a => a.active).map(a => [a.id, `${a.code} – ${a.name}`]);
+      const forOpts = accts.filter(a => a.active && !bookIds.has(a.id) && !memberAccounts.has(a.id))
+        .map(a => [a.id, `${a.code} – ${a.name} (${label(a.type)})`]);
+      const what = isPayments ? 'payment' : 'receipt';
+      modal({
+        title: `New ${what}`, submit: `Save ${what}`,
+        body: `<div class="row2">${inp('date', 'Date *', { type: 'date', req: 1, value: today() })}` +
+          `${inp('reference', isPayments ? 'Voucher no.' : 'Receipt no.', { ph: isPayments ? 'e.g. PV-001' : 'e.g. RCT-001' })}</div>` +
+          inp('party', isPayments ? 'Paid to *' : 'Received from *', { req: 1, ph: isPayments ? 'e.g. UMEME' : 'e.g. Stanbic Bank' }) +
+          ugx('amount', 'Amount *', { req: 1 }) +
+          `<div class="row2">${sel('moneyId', isPayments ? 'Paid from *' : 'Received into *', money, { req: 1, blank: '— Select —' })}` +
+          `${sel('forId', isPayments ? 'For (account debited) *' : 'For (account credited) *', forOpts, { req: 1, blank: '— Select —' })}</div>` +
+          inp('notes', 'Notes') +
+          (isPayments
+            ? `<p class="muted" style="margin:0">For the sacco's own spending (rent, salaries, stationery, bank charges...). ` +
+              `Savings withdrawals and loan payouts go through their own screens.</p>`
+            : `<p class="muted" style="margin:0">For money that is not a member's payment (bank interest, sale of forms, T-shirts...). ` +
+              `Member savings, shares and loan repayments go through Deposits → Regular deposit.</p>`),
+        onSubmit: async f => {
+          const v = fd(f), amount = Number(v.amount);
+          if (!(amount > 0)) throw new Error('Enter an amount above zero');
+          const moneyLine = { accountId: Number(v.moneyId), description: v.party };
+          const forLine = { accountId: Number(v.forId), description: v.party };
+          if (isPayments) { forLine.debit = amount; moneyLine.credit = amount; } else { moneyLine.debit = amount; forLine.credit = amount; }
+          const j = await api('/api/journals', { method: 'POST', body: {
+            date: v.date, reference: v.reference, narration: v.notes || (isPayments ? `Payment to ${v.party}` : `Receipt from ${v.party}`),
+            lines: isPayments ? [forLine, moneyLine] : [moneyLine, forLine] } });
+          toast(`${isPayments ? 'Payment' : 'Receipt'} saved as ${j.journalNo}`);
+          run().catch(x => toast(x.message, true));
+        }
+      });
+    } catch (x) { toast(x.message, true); }
+  };
 
   $('#repOpen').onclick = async () => {
     if (!form.reportValidity()) return;
@@ -1696,6 +1751,128 @@ function confirmDelete(kind, id) {
 }
 
 /* ------------------------------------------------------------------ audit trail */
+/* ------------------------------------------------------------------ messages (SMS to members) */
+const MSG_STATUS = { SENT: 'Sent', TEST: 'Test (not sent)', FAILED: 'Failed', NO_NUMBER: 'No mobile number', PENDING: 'Waiting' };
+const when = t => t ? new Date(t).toLocaleString('en-GB', { day: '2-digit', month: 'short', year: 'numeric', hour: '2-digit', minute: '2-digit' }) : '';
+/** Roughly how many SMS a text takes, for the counter while typing (the preview gives the exact count per member). */
+const smsParts = t => t.length <= 160 ? 1 : Math.ceil(t.length / 153);
+
+views.messages = async el => {
+  const [cfg, members] = await Promise.all([api('/api/messages/settings'), isMgr() ? Promise.resolve([]) : api('/api/members')]);
+  const employers = [...new Set(members.map(m => (m.employer || '').trim()).filter(Boolean))].sort();
+  const mode = cfg.live
+    ? `<div class="panel"><strong>Live:</strong> messages are sent by SMS through Africa's Talking${cfg.senderId ? `, as ${esc(cfg.senderId)}` : ''}` +
+      `${cfg.sandbox ? ' (sandbox: to their simulator only, not to real phones)' : ''}. Each SMS uses credit.</div>`
+    : `<div class="panel"><strong>Test mode:</strong> messages are prepared and kept in the history below, but no SMS is sent and no credit is used. ` +
+      `Real sending starts once the SMS account details are added to the server settings.</div>`;
+  el.innerHTML = mode + (isMgr() ? '' :
+    `<div class="panel"><h3>New message</h3><form id="msgForm">` +
+    `<div class="row2">${sel('audience', 'Send to', [['ALL', 'All members'], ['LOAN', 'Members with a loan'], ['EMPLOYER', 'Members of one employer'], ['CHOSEN', 'Chosen members']], { req: 1 })}` +
+    `<div id="msgEmployer" hidden>${sel('employer', 'Employer', employers.map(e => [e, e]), { blank: '— Select —' })}</div></div>` +
+    `<div id="msgChosen" hidden>${inp('find', 'Find members', { ph: 'Type a name or number, then tick the members below' })}` +
+    `<div id="msgPick" class="tbl-wrap" style="max-height:260px;overflow:auto"></div><p class="muted" id="msgPicked" style="margin:4px 0 0">None chosen</p></div>` +
+    `<label>Message<textarea name="text" rows="5" maxlength="900" required placeholder="Dear {name}, the AGM will be held on ..."></textarea></label>` +
+    `<p class="muted" style="margin:4px 0" id="msgCount">0 characters · 1 SMS per member</p>` +
+    `<p class="muted" style="margin:0 0 8px">Each member's own details can go in: <strong>{name}</strong>, <strong>{memberNo}</strong>, ` +
+    `<strong>{savings}</strong>, <strong>{shares}</strong>, <strong>{loan}</strong>.</p>` +
+    `<div class="toolbar"><button type="button" class="btn" id="msgPreview">Preview</button><button class="btn primary">${cfg.live ? 'Send' : 'Send (test)'}</button></div>` +
+    `</form><div id="msgOut"></div></div>`) +
+    `<div class="panel"><h3>Sent messages</h3><div id="msgHistory"></div></div>`;
+
+  const loadHistory = async () => {
+    const rows = await api('/api/messages');
+    $('#msgHistory').innerHTML = table([
+      { h: 'When', f: r => esc(when(r.createdAt)) },
+      { h: 'By', f: r => esc(r.createdBy || '') },
+      { h: 'To', f: r => esc(r.audience) },
+      { h: 'Message', f: r => esc(r.text.length > 80 ? r.text.slice(0, 80) + '…' : r.text) },
+      { h: 'Sent', num: 1, f: r => r.status === 'SENDING' ? 'sending…' : String(r.sent) },
+      { h: 'Not sent', num: 1, f: r => String(r.failed) },
+      { h: '', f: r => `${r.testMode ? '<span class="badge">Test</span> ' : ''}<button class="btn small" data-msg="${r.id}">View</button>` }
+    ], rows);
+    $('#msgHistory').querySelectorAll('[data-msg]').forEach(b => b.onclick = () => showBatch(b.dataset.msg).catch(x => toast(x.message, true)));
+    // while a message is still going out, look again shortly
+    if (rows.some(r => r.status === 'SENDING')) setTimeout(() => { if ($('#msgHistory')) loadHistory().catch(() => {}); }, 3000);
+  };
+  const showBatch = async id => {
+    const d = await api('/api/messages/' + id);
+    modal({
+      title: 'Message details', submit: 'Close', wide: true,
+      body: `<p><strong>${esc(d.batch.audience)}</strong> · ${esc(when(d.batch.createdAt))} by ${esc(d.batch.createdBy || '')}` +
+        `${d.batch.testMode ? ' · <span class="badge">Test mode: not sent</span>' : ''}</p><p class="muted">${esc(d.batch.text)}</p>` +
+        table([
+          { h: 'No', f: r => esc(r.memberNo || '') },
+          { h: 'Member', f: r => esc(r.memberName || '') },
+          { h: 'Phone', f: r => esc(r.phone || '') },
+          { h: 'Result', f: r => `<span class="badge ${r.status === 'SENT' ? 'in' : r.status === 'TEST' ? '' : 'out'}">${esc(MSG_STATUS[r.status] || r.status)}</span>` +
+            (r.error ? ` <span class="muted">${esc(r.error)}</span>` : '') },
+          { h: 'Cost', f: r => esc(r.cost || '') }
+        ], d.recipients),
+      onSubmit: async () => {}
+    });
+  };
+  await loadHistory();
+  if (isMgr()) return;
+
+  const form = $('#msgForm');
+  const audienceSel = $('select[name=audience]', form), text = $('textarea[name=text]', form);
+  const chosen = new Set();
+  const drawPick = () => {
+    const q = (fd(form).find || '').trim().toLowerCase();
+    const list = members.filter(m => !q || m.fullName.toLowerCase().includes(q) || String(m.memberNo).toLowerCase().includes(q)).slice(0, 200);
+    $('#msgPick').innerHTML = list.length ? `<table><tbody>${list.map(m => `<tr><td style="width:32px"><input type="checkbox" data-id="${m.id}"${chosen.has(m.id) ? ' checked' : ''}></td>` +
+      `<td>${esc(m.memberNo)}</td><td>${esc(m.fullName)}</td><td class="muted">${esc(m.phone || 'no phone')}</td></tr>`).join('')}</tbody></table>`
+      : '<div class="empty">No member matches.</div>';
+    $('#msgPick').querySelectorAll('input[type=checkbox]').forEach(c => c.onchange = () => {
+      const id = Number(c.dataset.id);
+      if (c.checked) chosen.add(id); else chosen.delete(id);
+      $('#msgPicked').textContent = chosen.size ? `${chosen.size} chosen` : 'None chosen';
+    });
+  };
+  audienceSel.onchange = () => {
+    $('#msgEmployer').hidden = audienceSel.value !== 'EMPLOYER';
+    $('#msgChosen').hidden = audienceSel.value !== 'CHOSEN';
+    if (audienceSel.value === 'CHOSEN') drawPick();
+  };
+  $('input[name=find]', form).addEventListener('input', drawPick);
+  $('input[name=find]', form).addEventListener('keydown', e => { if (e.key === 'Enter') e.preventDefault(); });
+  text.addEventListener('input', () => {
+    $('#msgCount').textContent = `${text.value.length} characters · ${smsParts(text.value)} SMS per member (more if the details make it longer)`;
+  });
+  const body = () => {
+    const f = fd(form);
+    return { audience: f.audience, employer: f.employer || null, memberIds: [...chosen], text: f.text };
+  };
+  const preview = async () => {
+    const p = await api('/api/messages/preview', { method: 'POST', body: body() });
+    $('#msgOut').innerHTML = `<div class="rep-totals">` +
+      [['Members', p.members], ['Will get it', p.withNumber], ['No mobile number', p.members - p.withNumber], ['SMS in all', p.totalSms]]
+        .map(([k, v]) => `<div class="rep-total"><span>${k}</span><strong>${v}</strong></div>`).join('') + `</div>` +
+      (p.samples.length ? `<h4 class="sect">What members will see</h4>` + table([
+        { h: 'Member', f: r => esc(`${r.memberNo} – ${r.name}`) }, { h: 'Phone', f: r => esc(r.phone) }, { h: 'Message', f: r => esc(r.text) }], p.samples) : '') +
+      (p.noNumber.length ? `<h4 class="sect">No usable mobile number (${p.noNumber.length}): these members will not get it</h4>` + table([
+        { h: 'No', f: r => esc(r.memberNo) }, { h: 'Member', f: r => esc(r.name) }, { h: 'Phone on record', f: r => esc(r.phoneOnRecord || '—') }], p.noNumber) : '');
+    return p;
+  };
+  $('#msgPreview').onclick = () => preview().catch(x => toast(x.message, true));
+  form.addEventListener('submit', async e => {
+    e.preventDefault();
+    try {
+      const p = await preview();
+      if (!p.withNumber) { toast('None of these members has a mobile number that can receive an SMS', true); return; }
+      const ask = cfg.live
+        ? `Send this SMS to ${p.withNumber} members? It uses about ${p.totalSms} SMS of credit and cannot be called back.`
+        : `Test mode: prepare this message for ${p.withNumber} members? Nothing is sent.`;
+      if (!confirm(ask)) return;
+      await api('/api/messages', { method: 'POST', body: body() });
+      toast(cfg.live ? 'Sending… the result of each member shows in the history' : 'Saved in test mode (not sent)');
+      form.reset(); chosen.clear(); audienceSel.onchange(); $('#msgOut').innerHTML = '';
+      $('#msgCount').textContent = '0 characters · 1 SMS per member';
+      await loadHistory();
+    } catch (x) { toast(x.message, true); }
+  });
+};
+
 views.audit = async el => {
   const branches = isMgr() ? await api('/api/branches') : [];
   el.innerHTML = `<div class="panel"><form class="toolbar" id="auditFilter">` +

@@ -5,10 +5,14 @@ import com.estates.sacco.repo.AccountRepository;
 import com.estates.sacco.repo.BranchRepository;
 import com.estates.sacco.repo.GeneralLedgerRepository;
 import com.estates.sacco.repo.MemberLedgerRepository;
+import com.estates.sacco.repo.MemberRepository;
+import com.estates.sacco.repo.ProductDefRepository;
 import com.estates.sacco.service.ReportDoc.Col;
 import com.estates.sacco.service.ReportDoc.Kv;
 import com.estates.sacco.service.ReportDoc.Section;
+import com.estates.sacco.web.ApiException;
 import lombok.RequiredArgsConstructor;
+import org.springframework.http.HttpStatus;
 import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
 
@@ -19,7 +23,7 @@ import java.util.*;
 import java.util.function.Function;
 import java.util.stream.Collectors;
 
-/** Builds the trial balance, income and expenditure, balance sheet and member statement from the ledgers. */
+/** Builds the trial balance, income and expenditure, balance sheet, member statement, member summary and cashbook from the ledgers. */
 @Service
 @RequiredArgsConstructor
 @Transactional(readOnly = true)
@@ -30,6 +34,9 @@ public class FinancialReportService {
     private final BranchRepository branches;
     private final PostingService posting;
     private final DeploymentSettings settings;
+    private final AccountCodes codes;
+    private final MemberRepository members;
+    private final ProductDefRepository products;
 
     private static final LocalDate EARLIEST = LocalDate.of(2000, 1, 1);
     private static final DateTimeFormatter DATE = DateTimeFormatter.ofPattern("dd MMM yyyy", Locale.ENGLISH);
@@ -159,7 +166,85 @@ public class FinancialReportService {
                 sections.isEmpty() ? "This member has no transactions yet." : null);
     }
 
-    private static BigDecimal[] zeros() {
+    // ------------------------------------------------------------------ member summary
+    /**
+     * Every member on one line with what they hold or owe at a date, in the member statement's columns: savings, savings interest,
+     * shares, membership, loan (principal) and loan interest. It follows the statement's rules, added up per member in a few queries
+     * rather than member by member: a repayment pays the interest that had fallen due first and the rest reduces the loan.
+     */
+    public ReportDoc memberSummary(Long branchId, LocalDate asAt) {
+        Map<Long, BigDecimal[]> byMember = balancesByMember(branchId, asAt);
+        int[] order = {0, 5, 1, 4, 2, 3};
+        BigDecimal[] sum = zeros();
+        List<List<String>> rows = new ArrayList<>();
+        List<Member> list = new ArrayList<>(members.search(branchId, null));
+        list.sort((a, b) -> compareMemberNo(a.getMemberNo(), b.getMemberNo()));
+        for (Member m : list) {
+            BigDecimal[] c = byMember.getOrDefault(m.getId(), zeros());
+            add(sum, c);
+            rows.add(shownRow(m.getMemberNo(), m.getFullName(), c, order, true));
+        }
+        List<Col> cols = List.of(new Col("No", false), new Col("Member", false), new Col("Savings", true), new Col("Savings interest", true),
+                new Col("Shares", true), new Col("Membership", true), new Col("Loan", true), new Col("Loan interest", true));
+        List<String> totalRow = shownRow("", "Total (" + list.size() + " members)", sum, order, false);
+        return new ReportDoc("Member Summary", branchLine(branchId), null, "As at " + asAt.format(DATE),
+                List.of(new Kv("Members", String.valueOf(list.size())), new Kv("Savings", fmt(sum[SAVINGS])), new Kv("Savings interest", fmt(sum[SAVINGS_INTEREST])),
+                        new Kv("Shares", fmt(sum[SHARES])), new Kv("Membership", fmt(sum[MEMBERSHIP])), new Kv("Loans", fmt(sum[LOAN])),
+                        new Kv("Loan interest owed", fmt(sum[LOAN_INTEREST]))),
+                List.of(new Section("Members", cols, rows, totalRow)), list.isEmpty() ? "There are no members yet." : null);
+    }
+
+    /** Where each figure sits in a member's balances (the member statement's columns). */
+    public static final int SAVINGS = 0, SHARES = 1, LOAN = 2, LOAN_INTEREST = 3, MEMBERSHIP = 4, SAVINGS_INTEREST = 5;
+
+    /** Every member's balances at a date (by member id; see SAVINGS, SHARES...), added up in a few queries. Members with no lines are left out. */
+    public Map<Long, BigDecimal[]> balancesByMember(Long branchId, LocalDate asAt) {
+        Map<Long, BigDecimal[]> byMember = new HashMap<>();
+        for (Object[] r : memberLedger.totalsByMember(branchId, asAt)) {
+            BigDecimal[] c = byMember.computeIfAbsent((Long) r[0], k -> zeros());
+            ProductCategory cat = (ProductCategory) r[1];
+            TxType type = (TxType) r[2];
+            BigDecimal dr = (BigDecimal) r[3], cr = (BigDecimal) r[4];
+            switch (cat) {
+                case SAVINGS -> c[0] = c[0].add(cr).subtract(dr);
+                case SHARES -> c[1] = c[1].add(cr).subtract(dr);
+                case MEMBERSHIP -> c[4] = c[4].add(cr).subtract(dr);
+                case SAVINGS_INTEREST -> c[5] = c[5].add(cr).subtract(dr);
+                default -> {
+                    if (type == TxType.LOAN_INTEREST) c[3] = c[3].add(dr);
+                    else if (type == TxType.LOAN_INTEREST_REVERSAL || type == TxType.LOAN_INTEREST_PAID) c[3] = c[3].subtract(cr);
+                    else if (type == TxType.LOAN_REPAYMENT) c[2] = c[2].subtract(cr);      // the interest part is moved back below
+                    else c[2] = c[2].add(dr).subtract(cr);
+                }
+            }
+        }
+        List<Long> interestAccounts = products.findAll().stream().filter(p -> p.getCategory() == ProductCategory.INTEREST_RECEIVABLE)
+                .map(p -> p.getGlAccount().getId()).distinct().toList();
+        if (!interestAccounts.isEmpty()) {
+            for (Object[] r : generalLedger.repaymentInterestByMember(branchId, interestAccounts, asAt)) {
+                BigDecimal[] c = byMember.computeIfAbsent((Long) r[0], k -> zeros());
+                BigDecimal interest = (BigDecimal) r[1];
+                c[3] = c[3].subtract(interest);
+                c[2] = c[2].add(interest);
+            }
+        }
+        return byMember;
+    }
+
+    /** Member numbers in natural order: M2 before M10, 99 before 100. */
+    public static int compareMemberNo(String a, String b) {
+        String x = a == null ? "" : a, y = b == null ? "" : b;
+        String px = x.replaceAll("\\d+$", ""), py = y.replaceAll("\\d+$", "");
+        if (!px.equalsIgnoreCase(py)) return px.compareToIgnoreCase(py);
+        String nx = x.substring(px.length()), ny = y.substring(py.length());
+        if (!nx.isEmpty() && !ny.isEmpty() && nx.length() < 19 && ny.length() < 19) {
+            int byNumber = Long.compare(Long.parseLong(nx), Long.parseLong(ny));
+            if (byNumber != 0) return byNumber;
+        }
+        return x.compareToIgnoreCase(y);
+    }
+
+    public static BigDecimal[] zeros() {
         return new BigDecimal[] {BigDecimal.ZERO, BigDecimal.ZERO, BigDecimal.ZERO, BigDecimal.ZERO, BigDecimal.ZERO, BigDecimal.ZERO};
     }
 
@@ -196,6 +281,150 @@ public class FinancialReportService {
             }
         }
         return c;
+    }
+
+    // ------------------------------------------------------------------ cashbook receipts
+    /** The accounts the cashbook covers: cash, bank and mobile money, by code. */
+    public List<Account> cashbookAccounts() {
+        return accounts.findAll().stream().filter(a -> a.getType() == AccountType.ASSET && codes.isCashbook(a.getCode()))
+                .sorted(Comparator.comparing(Account::getCode)).toList();
+    }
+
+    /** One line of the cashbook; a payroll batch adds all its members' lines into one. */
+    private static final class CashLine {
+        final LocalDate date;
+        final String ref, party;
+        String details;
+        BigDecimal amount;
+        int members = 1;
+        boolean transfer;
+
+        CashLine(LocalDate date, String ref, String party, String details, BigDecimal amount) {
+            this.date = date; this.ref = ref; this.party = party; this.details = details; this.amount = amount;
+        }
+    }
+
+    /**
+     * The cashbook of the cash, bank and mobile money accounts, one table per account, oldest first: money received (every debit
+     * on them) or, with {@code payments}, money paid out (every credit). A payroll batch is one line, not one per member. The details
+     * name the accounts on the other side of the same transaction (credited for a receipt, debited for a payment); money moved
+     * between the sacco's own cash and bank accounts is marked as a transfer and totalled on its own.
+     * {@code accountId} null: all cashbook accounts.
+     */
+    public ReportDoc cashbook(Long branchId, Long accountId, LocalDate from, LocalDate to, boolean payments) {
+        if (from.isAfter(to)) throw new ApiException(HttpStatus.BAD_REQUEST, "The From date is after the To date");
+        List<Account> book = cashbookAccounts();
+        if (accountId != null) {
+            book = book.stream().filter(a -> a.getId().equals(accountId)).toList();
+            if (book.isEmpty()) throw new ApiException(HttpStatus.BAD_REQUEST, "That account is not a cash, bank or mobile money account");
+        }
+        Map<Long, Account> all = accounts.findAll().stream().collect(Collectors.toMap(Account::getId, a -> a));
+        List<Object[]> raw = book.isEmpty() ? List.of()
+                : generalLedger.cashbook(branchId, book.stream().map(Account::getId).toList(), from, to, payments);
+
+        // what the money was for: the accounts on the other side of its transaction
+        Set<Long> journalIds = new HashSet<>(), entryIds = new HashSet<>();
+        Set<String> groups = new HashSet<>();
+        for (Object[] r : raw) {
+            if (r[12] != null) journalIds.add((Long) r[12]);
+            else if (r[8] != null && !payments) groups.add((String) r[8]);
+            else if (r[6] != null && r[9] == null) entryIds.add((Long) r[6]);
+        }
+        Map<String, Set<Long>> otherSide = new HashMap<>();
+        for (List<Long> ids : chunks(journalIds)) collect(otherSide, "J", generalLedger.otherSideOfJournals(ids, payments));
+        for (List<Long> ids : chunks(entryIds)) collect(otherSide, "E", generalLedger.otherSideOfEntries(ids, payments));
+        for (List<String> gs : chunks(groups)) collect(otherSide, "G", generalLedger.creditedByDeposits(gs));
+
+        Map<Long, List<CashLine>> byAccount = new LinkedHashMap<>();
+        Map<String, CashLine> payrolls = new HashMap<>();
+        for (Object[] r : raw) {
+            LocalDate date = (LocalDate) r[0];
+            Long account = (Long) r[1];
+            BigDecimal amount = (BigDecimal) r[2];
+            List<CashLine> list = byAccount.computeIfAbsent(account, k -> new ArrayList<>());
+            if (r[9] != null) {      // a member's line of a payroll batch: added to the batch's one line
+                String key = account + "|" + r[9] + "|" + date;
+                CashLine p = payrolls.get(key);
+                if (p == null) {
+                    p = new CashLine(date, "Payroll " + r[11], r[10] + " payroll", "", amount);
+                    payrolls.put(key, p);
+                    list.add(p);
+                } else {
+                    p.amount = p.amount.add(amount);
+                    p.members++;
+                }
+                p.details = "Payroll deductions, " + p.members + (p.members == 1 ? " member" : " members");
+                continue;
+            }
+            String ref = firstText((String) r[7], (String) r[14], (String) r[13]);
+            String party = r[4] != null ? r[4] + " - " + r[5] : firstText((String) r[3], (String) r[15]);
+            boolean grouped = r[12] == null && r[8] != null && !payments;
+            Set<Long> others = otherSide.get(r[12] != null ? "J" + r[12] : grouped ? "G" + r[8] : "E" + r[6]);
+            CashLine line = new CashLine(date, ref, party, "", amount);
+            describe(line, others, all, (String) r[3], payments);
+            list.add(line);
+        }
+
+        String received = payments ? "paid" : "received";
+        BigDecimal total = BigDecimal.ZERO, transfers = BigDecimal.ZERO;
+        int count = 0;
+        List<Col> cols = List.of(new Col("Date", false), new Col(payments ? "Voucher / Ref" : "Receipt / Ref", false),
+                new Col(payments ? "Paid to" : "Received from", false), new Col("Details", false), new Col("Amount", true));
+        List<Section> sections = new ArrayList<>();
+        for (Account a : book) {
+            List<CashLine> list = byAccount.getOrDefault(a.getId(), List.of());
+            if (list.isEmpty() && accountId == null) continue;       // all accounts: only those that moved money
+            BigDecimal sum = BigDecimal.ZERO;
+            List<List<String>> rows = new ArrayList<>();
+            for (CashLine l : list) {
+                rows.add(List.of(l.date.format(DATE), l.ref, l.party, l.details, fmt(l.amount)));
+                sum = sum.add(l.amount);
+                if (l.transfer) transfers = transfers.add(l.amount);
+            }
+            total = total.add(sum);
+            count += list.size();
+            sections.add(new Section(a.getCode() + " - " + a.getName(), cols, rows, List.of("", "", "", "Total " + received, fmt(sum))));
+        }
+        List<Kv> totals = new ArrayList<>(List.of(new Kv("Total " + received, fmt(total)), new Kv(payments ? "Payments" : "Receipts", String.valueOf(count))));
+        if (transfers.signum() > 0) {
+            totals.add(new Kv("Transfers between own accounts", fmt(transfers)));
+            totals.add(new Kv(payments ? "Paid to outside" : "Received from outside", fmt(total.subtract(transfers))));
+        }
+        String subject = accountId == null ? "All cash, bank and mobile money accounts" : book.get(0).getCode() + " - " + book.get(0).getName();
+        return new ReportDoc(payments ? "Cashbook Payments" : "Cashbook Receipts", branchLine(branchId), subject,
+                from.format(DATE) + " to " + to.format(DATE), totals, sections,
+                sections.isEmpty() ? "No money was " + received + " in this period." : null);
+    }
+
+    /** Fills in what the money was for, from the accounts on the other side (a transfer when they are all cashbook accounts). */
+    private void describe(CashLine line, Set<Long> others, Map<Long, Account> all, String fallback, boolean payments) {
+        List<Account> accs = others == null ? List.of() : others.stream().map(all::get).filter(Objects::nonNull)
+                .sorted(Comparator.comparing(Account::getCode)).toList();
+        if (accs.isEmpty()) {
+            line.details = fallback == null ? "" : fallback;
+            return;
+        }
+        line.transfer = accs.stream().allMatch(a -> a.getType() == AccountType.ASSET && codes.isCashbook(a.getCode()));
+        String names = accs.stream().limit(3).map(Account::getName).collect(Collectors.joining(", "))
+                + (accs.size() > 3 ? " and " + (accs.size() - 3) + " more" : "");
+        line.details = (line.transfer ? (payments ? "Transfer to " : "Transfer from ") : "") + names;
+    }
+
+    private static void collect(Map<String, Set<Long>> into, String prefix, List<Object[]> rows) {
+        for (Object[] r : rows) into.computeIfAbsent(prefix + r[0], k -> new HashSet<>()).add((Long) r[1]);
+    }
+
+    /** Splits a long list of ids into pieces, so no single query asks for thousands at once. */
+    private static <T> List<List<T>> chunks(Collection<T> items) {
+        List<T> list = new ArrayList<>(items);
+        List<List<T>> out = new ArrayList<>();
+        for (int i = 0; i < list.size(); i += 1000) out.add(list.subList(i, Math.min(i + 1000, list.size())));
+        return out;
+    }
+
+    private static String firstText(String... values) {
+        for (String v : values) if (v != null && !v.isBlank()) return v;
+        return "";
     }
 
     // ------------------------------------------------------------------ helpers

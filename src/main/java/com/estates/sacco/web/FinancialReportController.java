@@ -17,10 +17,11 @@ import org.springframework.transaction.annotation.Transactional;
 import org.springframework.web.bind.annotation.*;
 
 import java.time.LocalDate;
+import java.util.List;
 
 /**
  * Financial reports as data ({@code /api/reports/{kind}}) or PDF ({@code /api/reports/{kind}/pdf}).
- * Kinds: trial-balance, income-expenditure, balance-sheet, member-statement.
+ * Kinds: trial-balance, income-expenditure, balance-sheet, member-statement, member-summary, cashbook-receipts, cashbook-payments.
  * A branch admin always gets their own branch; the manager picks a branch or leaves it empty for all branches.
  */
 @RestController
@@ -32,14 +33,24 @@ public class FinancialReportController {
     private final LedgerService ledgerService;
     private final BranchScope scope;
 
+    public record CashbookAccount(Long id, String code, String name, boolean active) {}
+
+    /** The cash, bank and mobile money accounts the cashbook can be shown for (and, the active ones, receive money into). */
+    @GetMapping("/cashbook-accounts")
+    @Transactional(readOnly = true)
+    List<CashbookAccount> cashbookAccounts() {
+        return reports.cashbookAccounts().stream().map(a -> new CashbookAccount(a.getId(), a.getCode(), a.getName(), a.isActive())).toList();
+    }
+
     @GetMapping("/{kind}")
     @Transactional(readOnly = true)
     ReportDoc view(@PathVariable String kind,
                    @RequestParam(required = false) Long branchId,
                    @RequestParam(required = false) Long memberId,
+                   @RequestParam(required = false) Long accountId,
                    @RequestParam(required = false) @DateTimeFormat(iso = DateTimeFormat.ISO.DATE) LocalDate from,
                    @RequestParam(required = false) @DateTimeFormat(iso = DateTimeFormat.ISO.DATE) LocalDate to) {
-        return build(kind, branchId, memberId, from, to);
+        return build(kind, branchId, memberId, accountId, from, to);
     }
 
     @GetMapping("/{kind}/pdf")
@@ -47,9 +58,10 @@ public class FinancialReportController {
     ResponseEntity<byte[]> pdf(@PathVariable String kind,
                                @RequestParam(required = false) Long branchId,
                                @RequestParam(required = false) Long memberId,
+                               @RequestParam(required = false) Long accountId,
                                @RequestParam(required = false) @DateTimeFormat(iso = DateTimeFormat.ISO.DATE) LocalDate from,
                                @RequestParam(required = false) @DateTimeFormat(iso = DateTimeFormat.ISO.DATE) LocalDate to) {
-        ReportDoc doc = build(kind, branchId, memberId, from, to);
+        ReportDoc doc = build(kind, branchId, memberId, accountId, from, to);
         byte[] bytes = pdf.render(doc, scope.me().getUsername());
         String name = kind + "-" + LocalDate.now() + ".pdf";
         return ResponseEntity.ok()
@@ -58,7 +70,7 @@ public class FinancialReportController {
                 .body(bytes);
     }
 
-    private ReportDoc build(String kind, Long branchId, Long memberId, LocalDate from, LocalDate to) {
+    private ReportDoc build(String kind, Long branchId, Long memberId, Long accountId, LocalDate from, LocalDate to) {
         LocalDate end = to == null ? LocalDate.now() : to;
         switch (kind) {
             case "trial-balance":
@@ -72,6 +84,11 @@ public class FinancialReportController {
                 if (memberId == null) throw new ApiException(HttpStatus.BAD_REQUEST, "Choose a member");
                 Member m = ledgerService.requireMember(memberId);
                 return reports.memberStatement(m, from, end);
+            case "member-summary":
+                return reports.memberSummary(scope.readBranch(branchId), end);
+            case "cashbook-receipts", "cashbook-payments":
+                return reports.cashbook(scope.readBranch(branchId), accountId, from == null ? end.withDayOfMonth(1) : from, end,
+                        kind.equals("cashbook-payments"));
             default:
                 throw new ApiException(HttpStatus.NOT_FOUND, "Unknown report");
         }
