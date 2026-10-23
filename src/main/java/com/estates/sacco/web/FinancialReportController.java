@@ -21,7 +21,8 @@ import java.util.List;
 
 /**
  * Financial reports as data ({@code /api/reports/{kind}}) or PDF ({@code /api/reports/{kind}/pdf}).
- * Kinds: trial-balance, income-expenditure, balance-sheet, member-statement, member-summary, cashbook-receipts, cashbook-payments.
+ * Kinds: trial-balance, income-expenditure, balance-sheet, member-statement, member-summary, savings-report, shares-report,
+ * loan-report, cashbook-receipts, cashbook-payments.
  * A branch admin always gets their own branch; the manager picks a branch or leaves it empty for all branches.
  */
 @RestController
@@ -32,6 +33,7 @@ public class FinancialReportController {
     private final PdfReportService pdf;
     private final LedgerService ledgerService;
     private final BranchScope scope;
+    private final com.estates.sacco.service.MemberPhotoService photos;
 
     public record CashbookAccount(Long id, String code, String name, boolean active) {}
 
@@ -62,7 +64,9 @@ public class FinancialReportController {
                                @RequestParam(required = false) @DateTimeFormat(iso = DateTimeFormat.ISO.DATE) LocalDate from,
                                @RequestParam(required = false) @DateTimeFormat(iso = DateTimeFormat.ISO.DATE) LocalDate to) {
         ReportDoc doc = build(kind, branchId, memberId, accountId, from, to);
-        byte[] bytes = pdf.render(doc, scope.me().getUsername());
+        // the member statement carries the member's photo (build has already checked the member may be seen)
+        byte[] photo = kind.equals("member-statement") && memberId != null ? photos.photoOf(memberId).orElse(null) : null;
+        byte[] bytes = pdf.render(doc, scope.me().getUsername(), photo);
         String name = kind + "-" + LocalDate.now() + ".pdf";
         return ResponseEntity.ok()
                 .contentType(MediaType.APPLICATION_PDF)
@@ -86,6 +90,9 @@ public class FinancialReportController {
                 return reports.memberStatement(m, from, end);
             case "member-summary":
                 return reports.memberSummary(scope.readBranch(branchId), end);
+            case "savings-report", "shares-report", "loan-report":
+                return reports.balanceReport(scope.readBranch(branchId), end,
+                        kind.equals("savings-report") ? "savings" : kind.equals("shares-report") ? "shares" : "loans");
             case "cashbook-receipts", "cashbook-payments":
                 return reports.cashbook(scope.readBranch(branchId), accountId, from == null ? end.withDayOfMonth(1) : from, end,
                         kind.equals("cashbook-payments"));

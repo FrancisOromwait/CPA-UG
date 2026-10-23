@@ -194,6 +194,58 @@ public class FinancialReportService {
                 List.of(new Section("Members", cols, rows, totalRow)), list.isEmpty() ? "There are no members yet." : null);
     }
 
+    /**
+     * One kind of balance on its own, as at a date: "savings" (savings and the savings interest owed to the member), "shares", or
+     * "loans" (loan principal and the interest owed). Only members with something in it are listed. The figures are the member
+     * summary's, so the reports always agree.
+     */
+    public ReportDoc balanceReport(Long branchId, LocalDate asAt, String kind) {
+        record Part(String name, int at) {}
+        List<Part> parts;
+        String title, totalLabel, who;
+        switch (kind) {
+            case "savings" -> { title = "Savings Report"; parts = List.of(new Part("Savings", SAVINGS), new Part("Savings interest", SAVINGS_INTEREST));
+                totalLabel = "Total savings"; who = "Savers"; }
+            case "shares" -> { title = "Shares Report"; parts = List.of(new Part("Shares", SHARES)); totalLabel = "Total shares"; who = "Shareholders"; }
+            case "loans" -> { title = "Loan Report"; parts = List.of(new Part("Loan balance", LOAN), new Part("Interest owed", LOAN_INTEREST));
+                totalLabel = "Total owed"; who = "Borrowers"; }
+            default -> throw new ApiException(HttpStatus.NOT_FOUND, "Unknown report");
+        }
+        Map<Long, BigDecimal[]> byMember = balancesByMember(branchId, asAt);
+        List<Member> list = new ArrayList<>(members.search(branchId, null));
+        list.sort((a, b) -> compareMemberNo(a.getMemberNo(), b.getMemberNo()));
+        BigDecimal[] sums = new BigDecimal[parts.size()];
+        Arrays.fill(sums, BigDecimal.ZERO);
+        BigDecimal grand = BigDecimal.ZERO;
+        List<List<String>> rows = new ArrayList<>();
+        for (Member m : list) {
+            BigDecimal[] c = byMember.get(m.getId());
+            if (c == null || parts.stream().allMatch(p -> c[p.at()].signum() == 0)) continue;
+            List<String> row = new ArrayList<>(List.of(m.getMemberNo(), m.getFullName()));
+            BigDecimal total = BigDecimal.ZERO;
+            for (int i = 0; i < parts.size(); i++) {
+                BigDecimal v = c[parts.get(i).at()];
+                row.add(blankZero(v));
+                sums[i] = sums[i].add(v);
+                total = total.add(v);
+            }
+            if (parts.size() > 1) row.add(fmt(total));
+            grand = grand.add(total);
+            rows.add(row);
+        }
+        List<Col> cols = new ArrayList<>(List.of(new Col("No", false), new Col("Member", false)));
+        parts.forEach(p -> cols.add(new Col(p.name(), true)));
+        if (parts.size() > 1) cols.add(new Col("Total", true));
+        List<String> totalRow = new ArrayList<>(List.of("", "Total (" + rows.size() + " members)"));
+        for (BigDecimal s : sums) totalRow.add(fmt(s));
+        if (parts.size() > 1) totalRow.add(fmt(grand));
+        List<Kv> totals = new ArrayList<>(List.of(new Kv(who, String.valueOf(rows.size()))));
+        for (int i = 0; i < parts.size(); i++) totals.add(new Kv(parts.get(i).name(), fmt(sums[i])));
+        if (parts.size() > 1) totals.add(new Kv(totalLabel, fmt(grand)));
+        return new ReportDoc(title, branchLine(branchId), null, "As at " + asAt.format(DATE), totals,
+                List.of(new Section(who, cols, rows, totalRow)), rows.isEmpty() ? "No member has a balance here at this date." : null);
+    }
+
     /** Where each figure sits in a member's balances (the member statement's columns). */
     public static final int SAVINGS = 0, SHARES = 1, LOAN = 2, LOAN_INTEREST = 3, MEMBERSHIP = 4, SAVINGS_INTEREST = 5;
 

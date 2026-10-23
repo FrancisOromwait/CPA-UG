@@ -34,6 +34,7 @@ public class MemberPortalController {
     private final PasswordEncoder encoder;
     private final BranchScope scope;
     private final com.estates.sacco.repo.MobileMoneyNumberRepository numbers;
+    private final com.estates.sacco.service.MemberPhotoService photos;
 
     public record PasswordReq(@NotBlank @Size(min = 8, message = "must be at least 8 characters") String password) {}
 
@@ -63,7 +64,14 @@ public class MemberPortalController {
                 .contentType(MediaType.APPLICATION_PDF)
                 .header(HttpHeaders.CONTENT_DISPOSITION,
                         ContentDisposition.inline().filename("member-statement-" + LocalDate.now() + ".pdf").build().toString())
-                .body(pdf.render(doc, scope.me().getUsername()));
+                .body(pdf.render(doc, scope.me().getUsername(), photos.photoOf(member().getId()).orElse(null)));
+    }
+
+    /** The member's own photo, when the sacco has one. */
+    @GetMapping("/photo")
+    @Transactional(readOnly = true)
+    ResponseEntity<byte[]> photo() {
+        return photos.photoOf(member().getId()).map(MemberPhotoController::jpeg).orElseGet(() -> ResponseEntity.notFound().build());
     }
 
     public record PayTo(String network, String number, String holderName) {}

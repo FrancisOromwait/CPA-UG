@@ -216,7 +216,8 @@ $('#chpw').addEventListener('click', () => modal({
 }));
 
 const REPORT_KIDS = [['reports/trial-balance', 'Trial balance'], ['reports/income-expenditure', 'Income & expenditure'],
-  ['reports/balance-sheet', 'Balance sheet'], ['reports/member-statement', 'Member statement'], ['reports/member-summary', 'Member summary']];
+  ['reports/balance-sheet', 'Balance sheet'], ['reports/member-statement', 'Member statement'], ['reports/member-summary', 'Member summary'],
+  ['reports/savings-report', 'Savings report'], ['reports/shares-report', 'Shares report'], ['reports/loan-report', 'Loan report']];
 const NAV_ADMIN = [
   ['dashboard', 'Dashboard'],
   ['f-members', 'Members', [['members', 'Member list']]],
@@ -267,6 +268,9 @@ ICONS.messages = '<path d="M4 5h16a1 1 0 0 1 1 1v10a1 1 0 0 1-1 1H9l-5 4V6a1 1 0
 ICONS.withdrawals = '<rect x="3" y="7" width="18" height="12" rx="2"/><path d="M12 16V4m0 0l-3.5 3.5M12 4l3.5 3.5"/><circle cx="12" cy="13" r="1.6"/>';
 ICONS.mystatement = ICONS['reports/member-statement'];
 ICONS['reports/member-summary'] = ICONS.members;
+ICONS['reports/savings-report'] = ICONS.deposits;
+ICONS['reports/shares-report'] = '<path d="M12 3v9h9a9 9 0 1 1-9-9z"/><path d="M15 3.5a9 9 0 0 1 5.5 5.5H15z"/>';
+ICONS['reports/loan-report'] = ICONS.loans;
 ICONS.savingsinterest = ICONS.interest;
 ICONS['reports/cashbook-receipts'] = '<path d="M4 19.5V5a2 2 0 0 1 2-2h14v15H6a2 2 0 0 0-2 2 2 2 0 0 0 2 2h14v-4"/><path d="M12 6.5v7M9 10.5l3 3 3-3"/>';
 ICONS['reports/cashbook-payments'] = '<path d="M4 19.5V5a2 2 0 0 1 2-2h14v15H6a2 2 0 0 0-2 2 2 2 0 0 0 2 2h14v-4"/><path d="M12 13.5v-7M9 9.5l3-3 3 3"/>';
@@ -479,8 +483,9 @@ views.statement = async (el, id) => {
   const m = s.member;
   el.innerHTML =
     `<p><a href="#members">← Back to members</a></p>` +
-    `<div class="panel"><h3>${esc(m.fullName)} <span class="muted">· ${esc(m.memberNo)}${S.single ? '' : ' · ' + esc(m.branchCode)}</span></h3>` +
-    `<div class="kv"><div><span>Phone</span>${esc(m.phone || '—')}</div><div><span>Employer</span>${esc(m.employer || '—')}</div><div><span>Payroll no.</span>${esc(m.payrollNo || '—')}</div></div></div>` +
+    `<div class="panel"><div class="member-head"><div class="photo-box" id="photoBox"></div><div class="grow">` +
+    `<h3>${esc(m.fullName)} <span class="muted">· ${esc(m.memberNo)}${S.single ? '' : ' · ' + esc(m.branchCode)}</span></h3>` +
+    `<div class="kv"><div><span>Phone</span>${esc(m.phone || '—')}</div><div><span>Employer</span>${esc(m.employer || '—')}</div><div><span>Payroll no.</span>${esc(m.payrollNo || '—')}</div></div></div></div></div>` +
     `<div class="cards">${stat('', 'Savings balance', money(s.savingsBalance))}${stat('b2', 'Shares balance', money(s.sharesBalance))}` +
     `${stat('b3', 'Loan outstanding', money(s.loans.reduce((a, l) => a + Number(l.outstanding), 0)))}</div>` +
     `<div class="panel"><h3>Loans</h3>${loanTable(s.loans, false)}</div>` +
@@ -496,6 +501,36 @@ views.statement = async (el, id) => {
       { h: 'Credit', num: 1, f: r => Number(r.credit) ? money(r.credit) : '' },
       { h: 'Balance', num: 1, f: r => money(r.balance) }
     ], ml.lines, '', true) + `</div>`;
+
+  // the member's photo; any staff login can add, change or remove it (the support login only looks)
+  const photoPath = `/api/members/${encodeURIComponent(id)}/photo`;
+  const drawPhoto = async () => {
+    const url = await imageUrl(photoPath);
+    const canEdit = !isMgr();
+    $('#photoBox').innerHTML = (url ? `<img class="photo" src="${url}" alt="Photo of ${esc(m.fullName)}">` : '<div class="no-photo">No photo</div>') +
+      (!canEdit ? '' : `<input type="file" accept="image/*" id="photoFile" hidden><input type="file" accept="image/*" capture="user" id="photoCam" hidden>` +
+        `<button type="button" class="btn small" id="photoPick">${url ? 'Change photo' : 'Add photo'}</button>` +
+        `<button type="button" class="btn small" id="photoTake">Take photo</button>` +
+        (url ? `<button type="button" class="btn small danger" id="photoDel">Remove</button>` : ''));
+    if (!canEdit) return;
+    const upload = async file => {
+      if (!file) return;
+      try {
+        await api(photoPath, { method: 'PUT', body: { image: await photoData(file) } });
+        toast('Photo saved');
+        await drawPhoto();
+      } catch (x) { toast(x.message, true); }
+    };
+    $('#photoPick').onclick = () => $('#photoFile').click();
+    $('#photoTake').onclick = () => $('#photoCam').click();
+    $('#photoFile').onchange = e => upload(e.target.files[0]);
+    $('#photoCam').onchange = e => upload(e.target.files[0]);
+    if (url) $('#photoDel').onclick = async () => {
+      if (!confirm(`Remove the photo of ${m.fullName}?`)) return;
+      try { await api(photoPath, { method: 'DELETE' }); toast('Photo removed'); await drawPhoto(); } catch (x) { toast(x.message, true); }
+    };
+  };
+  await drawPhoto();
 };
 
 /* ------------------------------------------------------------------ loans */
@@ -657,7 +692,10 @@ views.mystatement = async el => {
     ['from', 'to'].forEach(k => { if (f[k]) qs.set(k, f[k]); });
     return qs;
   };
-  const run = async () => { $('#myOut').innerHTML = renderDoc(await api('/api/my/statement?' + query())); };
+  const run = async () => {
+    $('#myOut').innerHTML = renderDoc(await api('/api/my/statement?' + query()));
+    await addStatementPhoto($('#myOut'), '/api/my/photo');
+  };
   form.addEventListener('submit', e => { e.preventDefault(); run().catch(x => toast(x.message, true)); });
   $('#myOpen').onclick = async () => {
     const w = window.open('', '_blank');
@@ -864,6 +902,9 @@ const REPORTS = {
   'balance-sheet': { title: 'Balance sheet', range: false },
   'member-statement': { title: 'Member statement', range: true },
   'member-summary': { title: 'Member summary', range: false },
+  'savings-report': { title: 'Savings report', range: false },
+  'shares-report': { title: 'Shares report', range: false },
+  'loan-report': { title: 'Loan report', range: false },
   'cashbook-receipts': { title: 'Cashbook receipts', range: true },
   'cashbook-payments': { title: 'Cashbook payments', range: true }
 };
@@ -887,6 +928,40 @@ function renderDoc(doc) {
 }
 
 async function reportPdf(kind, qs) { return pdfUrl(`/api/reports/${kind}/pdf?${qs}`); }
+
+/** A picture the server gives only to a signed-in user (a member's photo), as an address the page can show; null when there is none. */
+async function imageUrl(path) {
+  const res = await fetch(path, { headers: { Authorization: S.auth } });
+  return res.ok ? URL.createObjectURL(await res.blob()) : null;
+}
+
+/** A chosen or newly taken photo as a JPEG of at most 600 pixels a side, the right way up (the server makes it smaller still). */
+function photoData(file) {
+  return new Promise((resolve, reject) => {
+    const img = new Image(), src = URL.createObjectURL(file);
+    img.onload = () => {
+      const scale = Math.min(1, 600 / Math.max(img.naturalWidth, img.naturalHeight));
+      const c = document.createElement('canvas');
+      c.width = Math.max(1, Math.round(img.naturalWidth * scale));
+      c.height = Math.max(1, Math.round(img.naturalHeight * scale));
+      const g = c.getContext('2d');
+      g.fillStyle = '#ffffff';
+      g.fillRect(0, 0, c.width, c.height);
+      g.drawImage(img, 0, 0, c.width, c.height);
+      URL.revokeObjectURL(src);
+      resolve(c.toDataURL('image/jpeg', 0.9));
+    };
+    img.onerror = () => { URL.revokeObjectURL(src); reject(new Error('That file is not a picture this browser can open')); };
+    img.src = src;
+  });
+}
+
+/** Puts a member's photo at the top right of a statement already on the page (nothing when there is no photo). */
+async function addStatementPhoto(out, path) {
+  const url = await imageUrl(path);
+  const head = $('.report-head', out);
+  if (url && head) head.insertAdjacentHTML('afterbegin', `<img class="rep-photo" src="${url}" alt="Member photo">`);
+}
 
 async function pdfUrl(path) {
   const res = await fetch(path, { headers: { Authorization: S.auth } });
@@ -926,7 +1001,11 @@ views.reports = async (el, kind) => {
     ['branchId', 'memberId', 'accountId', 'from', 'to'].forEach(k => { if (f[k]) qs.set(k, f[k]); });
     return qs;
   };
-  const run = async () => { $('#repOut').innerHTML = renderDoc(await api(`/api/reports/${kind}?` + query())); };
+  const run = async () => {
+    $('#repOut').innerHTML = renderDoc(await api(`/api/reports/${kind}?` + query()));
+    const memberId = fd(form).memberId;
+    if (isStatement && memberId) await addStatementPhoto($('#repOut'), `/api/members/${encodeURIComponent(memberId)}/photo`);
+  };
 
   if (isStatement) {
     const memberSel = $('select[name=memberId]', form);

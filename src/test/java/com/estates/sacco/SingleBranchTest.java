@@ -181,6 +181,28 @@ class SingleBranchTest {
         for (JsonNode r : detail.get("recipients")) result.put(r.get("memberNo").asText(), r.get("status").asText());
         assertEquals(java.util.Map.of("M1", "NO_NUMBER", "M2", "TEST", "M3", "NO_NUMBER"), result);
         assertEquals(1, send(support, "GET", "/api/messages", null, 200).size());
+
+        // member photos: any staff login adds one; it is stored small; the statement PDF carries it; support only looks
+        String photoUrl = "/api/members/" + member + "/photo";
+        mvc.perform(get(photoUrl).with(cashier)).andExpect(status().isNotFound());
+        java.awt.image.BufferedImage big = new java.awt.image.BufferedImage(1600, 1200, java.awt.image.BufferedImage.TYPE_INT_RGB);
+        java.io.ByteArrayOutputStream png = new java.io.ByteArrayOutputStream();
+        javax.imageio.ImageIO.write(big, "png", png);
+        String upload = "{\"image\":\"data:image/png;base64," + java.util.Base64.getEncoder().encodeToString(png.toByteArray()) + "\"}";
+        send(support, "PUT", photoUrl, upload, 403);
+        send(cashier, "PUT", photoUrl, "{\"image\":\"" + java.util.Base64.getEncoder().encodeToString("not a picture".getBytes()) + "\"}", 400);
+        send(cashier, "PUT", photoUrl, upload, 204);
+        byte[] stored = mvc.perform(get(photoUrl).with(support)).andExpect(status().isOk()).andReturn().getResponse().getContentAsByteArray();
+        java.awt.image.BufferedImage back = javax.imageio.ImageIO.read(new java.io.ByteArrayInputStream(stored));
+        assertEquals(400, back.getWidth());                                                                           // 1600 x 1200 made 400 x 300
+        assertEquals(300, back.getHeight());
+        byte[] withPhoto = mvc.perform(get("/api/reports/member-statement/pdf?memberId=" + member).with(cashier)).andReturn().getResponse().getContentAsByteArray();
+        java.util.regex.Pattern image = java.util.regex.Pattern.compile("/Subtype\\s*/Image");
+        org.junit.jupiter.api.Assertions.assertTrue(image.matcher(new String(withPhoto, java.nio.charset.StandardCharsets.ISO_8859_1)).find(), "the PDF carries the photo");
+        send(admin, "DELETE", photoUrl, null, 204);
+        mvc.perform(get(photoUrl).with(cashier)).andExpect(status().isNotFound());
+        byte[] withoutPhoto = mvc.perform(get("/api/reports/member-statement/pdf?memberId=" + member).with(cashier)).andReturn().getResponse().getContentAsByteArray();
+        org.junit.jupiter.api.Assertions.assertFalse(image.matcher(new String(withoutPhoto, java.nio.charset.StandardCharsets.ISO_8859_1)).find());
         mvc.perform(get("/api/reports/cashbook-receipts/pdf").with(cashier)).andExpect(status().isOk());
 
         // everyone changes their own password: the current one must be right

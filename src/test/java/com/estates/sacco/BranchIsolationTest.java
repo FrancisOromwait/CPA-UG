@@ -976,6 +976,24 @@ class BranchIsolationTest {
             }
         }
         org.junit.jupiter.api.Assertions.assertTrue(send(manager, "GET", "/api/reports/member-summary", null, 200).get("sections").get(0).get("rows").size() > 0);
+
+        // the savings, shares and loan reports list the members with a balance, with the member summary's figures
+        java.util.Map<String, JsonNode> summaryByNo = new java.util.HashMap<>();
+        for (JsonNode row : send(adminA, "GET", "/api/reports/member-summary", null, 200).get("sections").get(0).get("rows")) summaryByNo.put(row.get(0).asText(), row);
+        // report, then for each of its amount columns the member summary column it comes from (2 savings, 3 savings interest, 4 shares, 6 loan, 7 loan interest)
+        java.util.Map<String, int[]> fromSummary = java.util.Map.of("savings-report", new int[] {2, 3}, "shares-report", new int[] {4}, "loan-report", new int[] {6, 7});
+        for (var e : fromSummary.entrySet()) {
+            JsonNode rep = send(adminA, "GET", "/api/reports/" + e.getKey(), null, 200);
+            int listed = 0;
+            for (JsonNode row : rep.get("sections").get(0).get("rows")) {
+                JsonNode s = summaryByNo.get(row.get(0).asText());
+                for (int i = 0; i < e.getValue().length; i++) assertEquals(s.get(e.getValue()[i]).asText(), row.get(2 + i).asText(), e.getKey() + " " + row.get(0).asText());
+                listed++;
+            }
+            long withBalance = summaryByNo.values().stream().filter(s -> java.util.Arrays.stream(e.getValue()).anyMatch(c -> !s.get(c).asText().isEmpty())).count();
+            assertEquals(withBalance, listed, e.getKey() + ": members with a balance");
+            mvc.perform(get("/api/reports/" + e.getKey() + "/pdf").with(adminA)).andExpect(status().isOk());
+        }
         mvc.perform(get("/api/reports/member-summary/pdf").with(adminA)).andExpect(status().isOk());
     }
 }

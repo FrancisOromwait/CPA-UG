@@ -31,6 +31,7 @@ public class MemberController {
     private final BranchScope scope;
     private final com.estates.sacco.service.AuditService audit;
     private final com.estates.sacco.service.MemberLoginService logins;
+    private final com.estates.sacco.repo.MemberPhotoRepository photos;
 
     @GetMapping
     @Transactional(readOnly = true)
@@ -106,6 +107,7 @@ public class MemberController {
         }
         audit.log(m.getBranch(), "DELETE", "Member", m.getId(), m.getMemberNo() + " " + m.getFullName());
         logins.remove(m);
+        photos.deleteByMemberId(m.getId());
         members.delete(m);
     }
 

@@ -15,6 +15,7 @@ import java.awt.Color;
 import java.io.ByteArrayOutputStream;
 import java.time.LocalDateTime;
 import java.time.format.DateTimeFormatter;
+import java.util.ArrayList;
 import java.util.List;
 import java.util.Locale;
 
@@ -32,6 +33,11 @@ public class PdfReportService {
     }
 
     public byte[] render(ReportDoc doc, String generatedBy) {
+        return render(doc, generatedBy, null);
+    }
+
+    /** {@code photo}: a JPEG shown at the top right, beside the heading (the member's photo on their statement), or null for none. */
+    public byte[] render(ReportDoc doc, String generatedBy, byte[] photo) {
         ByteArrayOutputStream out = new ByteArrayOutputStream();
         // the member statement has a column for every kind of account, so it is printed wide with a line round every cell;
         // the member summary has the same columns, so it is printed wide too
@@ -48,13 +54,33 @@ public class PdfReportService {
             d.setFooter(footer);
             d.open();
 
-            d.add(new Paragraph(settings.getAppName(), font(Font.BOLD, 9, Color.GRAY)));
+            List<Element> heading = new ArrayList<>();
+            heading.add(new Paragraph(settings.getAppName(), font(Font.BOLD, 9, Color.GRAY)));
             Paragraph title = new Paragraph(doc.title(), font(Font.BOLD, 18, BRAND));
             title.setSpacingBefore(2);
-            d.add(title);
-            d.add(new Paragraph(doc.branchLine(), font(Font.BOLD, 12, Color.BLACK)));
-            if (doc.subjectLine() != null) d.add(new Paragraph(doc.subjectLine(), font(Font.NORMAL, 11, Color.BLACK)));
-            d.add(new Paragraph(doc.periodLine(), font(Font.NORMAL, 10, Color.DARK_GRAY)));
+            heading.add(title);
+            heading.add(new Paragraph(doc.branchLine(), font(Font.BOLD, 12, Color.BLACK)));
+            if (doc.subjectLine() != null) heading.add(new Paragraph(doc.subjectLine(), font(Font.NORMAL, 11, Color.BLACK)));
+            heading.add(new Paragraph(doc.periodLine(), font(Font.NORMAL, 10, Color.DARK_GRAY)));
+            Image picture = picture(photo);
+            if (picture == null) {
+                for (Element e : heading) d.add(e);
+            } else {
+                // the heading on the left, the photo on the right
+                PdfPTable head = new PdfPTable(2);
+                head.setWidthPercentage(100);
+                head.setWidths(new float[] {5f, 1.3f});
+                PdfPCell left = new PdfPCell();
+                left.setBorder(Rectangle.NO_BORDER);
+                for (Element e : heading) left.addElement(e);
+                PdfPCell right = new PdfPCell(picture, false);
+                right.setBorder(Rectangle.NO_BORDER);
+                right.setHorizontalAlignment(Element.ALIGN_RIGHT);
+                right.setVerticalAlignment(Element.ALIGN_TOP);
+                head.addCell(left);
+                head.addCell(right);
+                d.add(head);
+            }
 
             if (!doc.totals().isEmpty()) d.add(totalsBox(doc.totals()));
             if (doc.note() != null) {
@@ -69,6 +95,18 @@ public class PdfReportService {
             if (d.isOpen()) d.close();
         }
         return out.toByteArray();
+    }
+
+    /** The photo at most 85 points a side, or null when there is none or it cannot be read (the PDF is then made without it). */
+    private static Image picture(byte[] photo) {
+        if (photo == null) return null;
+        try {
+            Image img = Image.getInstance(photo);
+            img.scaleToFit(85, 85);
+            return img;
+        } catch (Exception e) {
+            return null;
+        }
     }
 
     /** The heading totals, one box per figure. */
