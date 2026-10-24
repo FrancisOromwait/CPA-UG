@@ -117,6 +117,19 @@ input:disabled { background: var(--blue-soft); color: var(--muted); }
 }
 .nav-sub { display: flex; flex-direction: column; gap: 2px; }
 .nav-sub a { font-size: 14px; }
+/* a drop-down inside a folder (e.g. "Accounts reports" in the Accounts menu): a click opens or closes its list of screens */
+.nav-drop-btn {
+  display: flex; align-items: center; gap: 11px; width: 100%; text-align: left;
+  background: none; border: 0; color: var(--white); font: inherit; font-size: 14px; font-weight: 500;
+  padding: 6px 8px; border-radius: 10px; opacity: .9; cursor: pointer;
+}
+.nav-drop-btn:hover { background: rgba(255, 255, 255, .12); opacity: 1; }
+.nav-drop-btn:hover .nav-ic { background: rgba(37, 99, 235, .65); }
+.nav-drop-btn .chev { margin-left: auto; font-size: 11px; transition: transform .15s; }
+.nav-drop-btn[aria-expanded="true"] .chev { transform: rotate(90deg); }
+.nav-drop-list { display: flex; flex-direction: column; gap: 2px; margin: 2px 0 4px 18px; padding-left: 8px; border-left: 1px solid rgba(255, 255, 255, .25); }
+.nav-drop-list[hidden] { display: none; }
+.nav-drop-list a { font-size: 13.5px; }
 
 /* report heading with branch totals */
 .report-head .rep-title { font-size: 20px; margin: 4px 0; color: var(--blue); }

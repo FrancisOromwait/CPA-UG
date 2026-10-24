@@ -220,13 +220,13 @@ const REPORT_KIDS = [['reports/trial-balance', 'Trial balance'], ['reports/incom
   ['reports/savings-report', 'Savings report'], ['reports/shares-report', 'Shares report'], ['reports/loan-report', 'Loan report']];
 const NAV_ADMIN = [
   ['dashboard', 'Dashboard'],
-  ['f-members', 'Members', [['members', 'Member list']]],
-  ['f-deposits', 'Deposits', [['deposits', 'Regular deposit'], ['payroll', 'Payroll deductions'], ['payrollpaste', 'Payroll from Excel']]],
-  ['f-savings', 'Savings', [['withdrawals', 'Savings withdrawal'], ['savingsinterest', 'Savings interest']]],
-  ['f-loans', 'Loans', [['loans', 'Loan applications'], ['interest', 'Interest computation']]],
-  ['f-cashbook', 'Cashbook', [['reports/cashbook-receipts', 'Receipts'], ['reports/cashbook-payments', 'Payments']]],
-  ['f-accounting', 'Accounting', [['accounts', 'Chart of accounts'], ['products', 'Products'], ['journals', 'Journal entries'], ['gl', 'General ledger'], ['audit', 'Audit trail']]],
-  ['f-reports', 'Reports', REPORT_KIDS]
+  ['f-accountsmenu', 'Accounts menu', [['reports/cashbook-receipts', 'Cashbook receipts'], ['reports/cashbook-payments', 'Cashbook payments'],
+    ['journals', 'Journal entries'], ['accounts', 'Chart of accounts'], ['d-acreports', 'Accounts reports', [['gl', 'General ledger'], ...REPORT_KIDS]]]],
+  ['f-savingscredit', 'Savings and credit menu', [['members', 'Member list'], ['deposits', 'Regular deposit'],
+    ['loans', 'Loan applications'], ['withdrawals', 'Savings withdrawal']]],
+  ['f-adminfunctions', 'Administrative functions', [['savingsinterest', 'Savings interest computation'], ['interest', 'Loan interest computation'],
+    ['payroll', 'Payroll deductions'], ['payrollpaste', 'Payroll from Excel']]],
+  ['f-accounting', 'Accounting', [['products', 'Products'], ['audit', 'Audit trail']]]
 ];
 /* a branch admin also gets the staff screen (just before Accounting); treasurers and cashiers have the plain branch menu */
 const ACC_AT = NAV_ADMIN.findIndex(([k]) => k === 'f-accounting');
@@ -271,15 +271,27 @@ ICONS['reports/member-summary'] = ICONS.members;
 ICONS['reports/savings-report'] = ICONS.deposits;
 ICONS['reports/shares-report'] = '<path d="M12 3v9h9a9 9 0 1 1-9-9z"/><path d="M15 3.5a9 9 0 0 1 5.5 5.5H15z"/>';
 ICONS['reports/loan-report'] = ICONS.loans;
+ICONS['d-acreports'] = '<path d="M4 20V10M10 20V4M16 20v-7M22 20H2"/>';
 ICONS.savingsinterest = ICONS.interest;
 ICONS['reports/cashbook-receipts'] = '<path d="M4 19.5V5a2 2 0 0 1 2-2h14v15H6a2 2 0 0 0-2 2 2 2 0 0 0 2 2h14v-4"/><path d="M12 6.5v7M9 10.5l3 3 3-3"/>';
 ICONS['reports/cashbook-payments'] = '<path d="M4 19.5V5a2 2 0 0 1 2-2h14v15H6a2 2 0 0 0-2 2 2 2 0 0 0 2 2h14v-4"/><path d="M12 13.5v-7M9 9.5l3-3 3 3"/>';
 const navIcon = k => ICONS[k] ? `<span class="nav-ic"><svg viewBox="0 0 24 24" aria-hidden="true">${ICONS[k]}</svg></span>` : '';
 
+/** Opens or closes a drop-down in the menu. */
+function openDrop(drop, open) {
+  $('.nav-drop-list', drop).hidden = !open;
+  $('.nav-drop-btn', drop).setAttribute('aria-expanded', String(open));
+}
+
 function navHtml(items) {
   return items.map(([k, t, kids]) => kids
     ? `<div class="nav-group"><div class="nav-heading">${esc(t)}</div>` +
-      `<div class="nav-sub">${kids.map(([ck, ct]) => `<a href="#${ck}" data-k="${ck}">${navIcon(ck)}<span>${esc(ct)}</span></a>`).join('')}</div></div>`
+      `<div class="nav-sub">${kids.map(([ck, ct, sub]) => sub
+        // an entry with screens of its own is a drop-down: a click on it opens or closes the list
+        ? `<div class="nav-drop"><button type="button" class="nav-drop-btn" aria-expanded="false">${navIcon(ck)}<span>${esc(ct)}</span>` +
+          `<span class="chev">▶</span></button><div class="nav-drop-list" hidden>` +
+          sub.map(([sk, st]) => `<a href="#${sk}" data-k="${sk}">${navIcon(sk)}<span>${esc(st)}</span></a>`).join('') + `</div></div>`
+        : `<a href="#${ck}" data-k="${ck}">${navIcon(ck)}<span>${esc(ct)}</span></a>`).join('')}</div></div>`
     : `<a href="#${k}" data-k="${k}">${navIcon(k)}<span>${esc(t)}</span></a>`).join('');
 }
 
@@ -287,6 +299,7 @@ function start() {
   $('#login').hidden = true;
   $('#app').hidden = false;
   $('#nav').innerHTML = navHtml(navFor());
+  $('#nav').querySelectorAll('.nav-drop-btn').forEach(b => b.onclick = () => openDrop(b.parentElement, b.getAttribute('aria-expanded') !== 'true'));
   $('#who').innerHTML = `${esc(S.me.fullName)}<small>${esc(label(S.me.role))}</small>`;
   const brand = isMgr() ? S.appName : S.me.branchName;
   $('#brandName').textContent = brand;
@@ -309,7 +322,7 @@ async function route() {
   const home = isMember() ? 'mystatement' : 'dashboard';
   const [name, arg] = (location.hash.slice(1) || home).split('/');
   const pageKey = name === 'reports' ? 'reports/' + (arg || 'trial-balance') : name;
-  const allowed = new Set(navFor().flatMap(([k, , kids]) => kids ? kids.map(c => c[0]) : [k]));
+  const allowed = new Set(navFor().flatMap(([k, , kids]) => kids ? kids.flatMap(([ck, , sub]) => sub ? sub.map(s => s[0]) : [ck]) : [k]));
   if (!isMember()) allowed.add('statement');
   if (!allowed.has(pageKey)) {          // e.g. a manager-only page left in the address from an earlier sign-in
     if (location.hash !== '#' + home) location.hash = '#' + home; else views[home]($('#view'));
@@ -319,6 +332,8 @@ async function route() {
   const key = views[name] ? name : home;
   const navKey = key === 'statement' ? 'members' : key === 'reports' ? 'reports/' + (arg || 'trial-balance') : key;
   document.querySelectorAll('#nav a').forEach(a => a.classList.toggle('active', a.dataset.k === navKey));
+  // the drop-down holding the open screen is shown open, so the highlighted entry can be seen
+  document.querySelectorAll('#nav .nav-drop').forEach(d => { if (d.querySelector('a.active')) openDrop(d, true); });
   $('#title').textContent = TITLES[key];
   const el = $('#view');
   el.innerHTML = '<div class="empty">Loading…</div>';
