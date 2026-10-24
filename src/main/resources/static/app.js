@@ -133,7 +133,8 @@ function brandLogin() {
   const b = loginBranches.find(x => String(x.id) === v);
   $('#loginMark').innerHTML = markHtml(b ? b.name : S.appName, b ? b.code : HQ);
   $('#loginTitle').textContent = b ? b.name : S.appName;
-  $('#loginSub').textContent = b ? `Sign in to ${b.name}` : v === HQ ? 'Head office sign-in for the manager.' : 'Choose your branch, then sign in.';
+  $('#loginSub').textContent = b ? `Sign in to ${b.name}` : v === HQ ? 'Head office sign-in for the manager.'
+    : oneBranchLogin() ? 'Sign in to continue.' : 'Choose your branch, then sign in.';
   document.title = b ? `${b.name} · Sign in` : S.appName;
   try { if (v) localStorage.setItem('lastBranch', v); } catch (e) { /* ignore */ }
 }
@@ -146,18 +147,21 @@ async function loadConfig() {
   } catch (e) { /* keep the defaults */ }
 }
 
+/** One branch and not the support address: there is no branch to choose, and signing in does not wait for the branch list. */
+const oneBranchLogin = () => S.single && location.hash !== '#support';   // the support login is reached by adding #support to the address
+
 async function loadLoginBranches() {
-  const s = $('#loginBranch');
+  const s = $('#loginBranch'), field = s.closest('label');
+  await loadConfig();
+  // the branch list is shown only when there is something to choose; it starts hidden, so "Loading branches…" never shows here
+  const choose = !oneBranchLogin();
+  field.hidden = !choose;
+  s.required = choose;
   try {
-    await loadConfig();
     loginBranches = await api('/api/public/branches', { login: true });
-    const support = location.hash === '#support';        // the support login is reached by adding #support to the address
-    if (S.single && !support) {
-      // one branch: nothing to choose, so the list is not shown
+    if (!choose) {
       s.innerHTML = loginBranches.map(b => `<option value="${b.id}">${esc(b.name)}</option>`).join('');
-      s.closest('label').hidden = true;
     } else {
-      s.closest('label').hidden = false;
       s.innerHTML = '<option value="">Select your branch…</option>' +
         `<option value="${HQ}">Head office (Manager)</option>` +
         loginBranches.map(b => `<option value="${b.id}">${esc(b.name)}</option>`).join('');
@@ -165,7 +169,7 @@ async function loadLoginBranches() {
     let last = ''; try { last = localStorage.getItem('lastBranch') || ''; } catch (e) { /* ignore */ }
     if (last && [...s.options].some(o => o.value === last)) s.value = last;
   } catch (err) {
-    s.innerHTML = '<option value="">Could not load branches</option>';
+    if (choose) s.innerHTML = '<option value="">Could not load branches</option>';
   }
   brandLogin();
 }
@@ -179,9 +183,11 @@ $('#loginForm').addEventListener('submit', async e => {
   S.auth = 'Basic ' + btoa(unescape(encodeURIComponent(`${f.get('username').trim()}:${f.get('password')}`)));
   try {
     S.me = await api('/api/me', { login: true });
-    // The account must belong to the branch chosen on the form
+    // The account must belong to the branch chosen on the form (one branch: every branch login belongs to it)
     const chosen = f.get('branch');
-    if (chosen === HQ) {
+    if (oneBranchLogin()) {
+      if (isMgr()) throw new Error('The manager signs in under Head office.');
+    } else if (chosen === HQ) {
       if (!isMgr()) throw new Error('This is a branch account. Select your branch instead.');
     } else if (isMgr() || String(S.me.branchId) !== chosen) {
       const b = loginBranches.find(x => String(x.id) === chosen);

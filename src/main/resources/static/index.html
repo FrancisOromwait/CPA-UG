@@ -16,8 +16,9 @@
     <h1 id="loginTitle">CPA Uganda</h1>
     <p class="muted" id="loginSub">Sign in to continue.</p>
     <form id="loginForm" autocomplete="on">
-      <label>Sacco branch
-        <select name="branch" id="loginBranch" required>
+      <!-- hidden unless there is a branch to choose (several branches, or the support login at #support) -->
+      <label hidden>Sacco branch
+        <select name="branch" id="loginBranch">
           <option value="">Loading branches…</option>
         </select>
       </label>
