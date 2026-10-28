@@ -206,6 +206,15 @@ $('#loginForm').addEventListener('submit', async e => {
 
 $('#logout').addEventListener('click', signOut);
 
+/* the signed-in person at the foot of the menu opens a small menu (change password, sign out); any other click or Escape closes it */
+function showMeMenu(open) {
+  $('#meMenu').classList.toggle('open', open);
+  $('#meBtn').setAttribute('aria-expanded', String(open));
+}
+$('#meBtn').addEventListener('click', e => { e.stopPropagation(); showMeMenu($('#meBtn').getAttribute('aria-expanded') !== 'true'); });
+document.addEventListener('click', () => showMeMenu(false));
+document.addEventListener('keydown', e => { if (e.key === 'Escape') showMeMenu(false); });
+
 $('#chpw').addEventListener('click', () => modal({
   title: 'Change password', submit: 'Save password',
   body: inp('currentPassword', 'Current password', { type: 'password', req: 1 }) +
@@ -278,7 +287,8 @@ ICONS['reports/savings-report'] = ICONS.deposits;
 ICONS['reports/shares-report'] = '<path d="M12 3v9h9a9 9 0 1 1-9-9z"/><path d="M15 3.5a9 9 0 0 1 5.5 5.5H15z"/>';
 ICONS['reports/loan-report'] = ICONS.loans;
 ICONS['d-acreports'] = '<path d="M4 20V10M10 20V4M16 20v-7M22 20H2"/>';
-ICONS.savingsinterest = ICONS.interest;
+/* savings interest: a stack of coins with an arrow up (loan interest keeps the calendar) */
+ICONS.savingsinterest = '<ellipse cx="9" cy="6" rx="6" ry="2.5"/><path d="M3 6v4.5c0 1.4 2.7 2.5 6 2.5s6-1.1 6-2.5V6"/><path d="M3 10.5V15c0 1.4 2.7 2.5 6 2.5"/><path d="M18 21v-8M15 16l3-3 3 3"/>';
 ICONS['reports/cashbook-receipts'] = '<path d="M4 19.5V5a2 2 0 0 1 2-2h14v15H6a2 2 0 0 0-2 2 2 2 0 0 0 2 2h14v-4"/><path d="M12 6.5v7M9 10.5l3 3 3-3"/>';
 ICONS['reports/cashbook-payments'] = '<path d="M4 19.5V5a2 2 0 0 1 2-2h14v15H6a2 2 0 0 0-2 2 2 2 0 0 0 2 2h14v-4"/><path d="M12 13.5v-7M9 9.5l3-3 3 3"/>';
 const navIcon = k => ICONS[k] ? `<span class="nav-ic"><svg viewBox="0 0 24 24" aria-hidden="true">${ICONS[k]}</svg></span>` : '';
@@ -295,8 +305,9 @@ function navHtml(items) {
       `<div class="nav-sub">${kids.map(([ck, ct, sub]) => sub
         // an entry with screens of its own is a drop-down: a click on it opens or closes the list
         ? `<div class="nav-drop"><button type="button" class="nav-drop-btn" aria-expanded="false">${navIcon(ck)}<span>${esc(ct)}</span>` +
-          `<span class="chev">▶</span></button><div class="nav-drop-list" hidden>` +
-          sub.map(([sk, st]) => `<a href="#${sk}" data-k="${sk}">${navIcon(sk)}<span>${esc(st)}</span></a>`).join('') + `</div></div>`
+          `<span class="chev" aria-hidden="true"><svg viewBox="0 0 24 24"><path d="M6 9l6 6 6-6"/></svg></span></button><div class="nav-drop-list" hidden>` +
+          // the screens inside a drop-down hang from a line, so they carry no icon of their own
+          sub.map(([sk, st]) => `<a href="#${sk}" data-k="${sk}"><span>${esc(st)}</span></a>`).join('') + `</div></div>`
         : `<a href="#${ck}" data-k="${ck}">${navIcon(ck)}<span>${esc(ct)}</span></a>`).join('')}</div></div>`
     : `<a href="#${k}" data-k="${k}">${navIcon(k)}<span>${esc(t)}</span></a>`).join('');
 }
@@ -307,9 +318,15 @@ function start() {
   $('#nav').innerHTML = navHtml(navFor());
   $('#nav').querySelectorAll('.nav-drop-btn').forEach(b => b.onclick = () => openDrop(b.parentElement, b.getAttribute('aria-expanded') !== 'true'));
   $('#who').innerHTML = `${esc(S.me.fullName)}<small>${esc(label(S.me.role))}</small>`;
+  $('#meBtn').title = `${S.me.fullName} · ${label(S.me.role)}`;
+  const names = String(S.me.fullName || S.me.username || '?').trim().split(/\s+/);
+  $('#whoInitials').textContent = (names.length > 1 ? names[0][0] + names[names.length - 1][0] : names[0].slice(0, 2)).toUpperCase();
   const brand = isMgr() ? S.appName : S.me.branchName;
   $('#brandName').textContent = brand;
-  $('#brandMark').innerHTML = markHtml(brand, isMgr() ? HQ : S.me.branchCode, true);
+  // one branch: CPA Uganda's own logo; several: the coloured initials as before
+  $('#brandMark').innerHTML = S.single
+    ? `<span class="brand-logo" role="img" aria-label="${esc(brand)} logo"></span>`
+    : markHtml(brand, isMgr() ? HQ : S.me.branchCode, true);
   document.title = isMgr() ? `${S.appName} · Support` : brand;
   const scopeText = isMgr() ? 'All branches' : S.single ? '' : `Sacco ID ${S.me.branchCode}`;
   $('#scope').textContent = scopeText;
