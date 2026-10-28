@@ -435,6 +435,21 @@ const ISX = {
     '<path d="M5 15c-2.21 0-4 1.79-4 4 0 .75.21 1.46.58 2.06A3.97 3.97 0 0 0 5 23c1.46 0 2.73-.78 3.42-1.94.37-.6.58-1.31.58-2.06 0-2.21-1.79-4-4-4Zm1.49 4.73h-.74v.78c0 .41-.34.75-.75.75s-.75-.34-.75-.75v-.78h-.74c-.41 0-.75-.34-.75-.75s.34-.75.75-.75h.74v-.71c0-.41.34-.75.75-.75s.75.34.75.75v.71h.74a.749.749 0 1 1 0 1.5ZM21.5 12.5H19c-1.1 0-2 .9-2 2s.9 2 2 2h2.5c.28 0 .5-.22.5-.5v-3c0-.28-.22-.5-.5-.5ZM16.53 5.4c.3.29.05.74-.37.74l-8.28-.01c-.48 0-.72-.58-.38-.92l1.75-1.76a3.796 3.796 0 0 1 5.35 0l1.89 1.91.04.04Z" fill="currentColor"/><path d="M21.87 18.66C21.26 20.72 19.5 22 17.1 22h-6.5c-.39 0-.64-.43-.48-.79.3-.7.49-1.49.49-2.21 0-3.03-2.47-5.5-5.5-5.5-.76 0-1.5.16-2.18.46-.37.16-.82-.09-.82-.49V12c0-2.72 1.64-4.62 4.19-4.94.25-.04.52-.06.8-.06h10c.26 0 .51.01.75.05 2.02.23 3.48 1.46 4.02 3.29.1.33-.14.66-.48.66H19.1c-2.17 0-3.89 1.98-3.42 4.23.33 1.64 1.85 2.77 3.52 2.77h2.19c.35 0 .58.34.48.66Z" fill="currentColor"/>'],
   WalletMinus: ['<path d="M14.262 15.998h-5" stroke="currentColor" stroke-width="1.5" stroke-miterlimit="10" stroke-linecap="round" stroke-linejoin="round"/><path d="m12.66 2.518-.03.07-2.9 6.73H6.88c-.68 0-1.33.14-1.92.39l1.75-4.18.04-.1.07-.16c.02-.06.04-.12.07-.17 1.31-3.03 2.79-3.72 5.77-2.58Z" stroke="currentColor" stroke-width="1.5" stroke-linecap="round" stroke-linejoin="round"/><path d="M18.05 9.518c-.45-.14-.93-.2-1.41-.2H9.73l2.9-6.73.03-.07c.15.05.29.12.44.18l2.21.93c1.23.51 2.09 1.04 2.61 1.68.1.12.18.23.25.36.09.14.16.28.2.43.04.09.07.18.09.26.27.84.11 1.87-.41 3.16Z" stroke="currentColor" stroke-width="1.5" stroke-linecap="round" stroke-linejoin="round"/><path d="M21.522 14.198v1.95c0 .2-.01.4-.02.6-.19 3.49-2.14 5.25-5.84 5.25h-7.8c-.24 0-.48-.02-.71-.05-3.18-.21-4.88-1.91-5.09-5.09-.03-.23-.05-.47-.05-.71v-1.95c0-2.01 1.22-3.74 2.96-4.49.6-.25 1.24-.39 1.92-.39h9.76c.49 0 .97.07 1.41.2 1.99.61 3.46 2.47 3.46 4.68Z" stroke="currentColor" stroke-width="1.5" stroke-linecap="round" stroke-linejoin="round"/><path d="m6.71 5.528-1.75 4.18A4.894 4.894 0 0 0 2 14.198v-2.93c0-2.84 2.02-5.21 4.71-5.74ZM21.519 11.268v2.93c0-2.2-1.46-4.07-3.46-4.67.52-1.3.67-2.32.42-3.17-.02-.09-.05-.18-.09-.26 1.86.96 3.13 2.93 3.13 5.17Z" stroke="currentColor" stroke-width="1.5" stroke-linecap="round" stroke-linejoin="round"/>',
     '<path d="m11.94 2.212-2.41 5.61H7.12c-.4 0-.79.03-1.17.11l1-2.4.04-.09.06-.16c.03-.07.05-.13.08-.18 1.16-2.69 2.46-3.53 4.81-2.89ZM18.731 8.09l-.02-.01c-.6-.17-1.21-.26-1.83-.26h-6.26l2.25-5.23.03-.07c.14.05.29.12.44.17l2.21.93c1.23.51 2.09 1.04 2.62 1.68.09.12.17.23.25.36.09.14.16.28.2.43.04.09.07.17.09.26.15.51.16 1.09.02 1.74ZM18.288 9.52c-.45-.13-.92-.2-1.41-.2h-9.76c-.68 0-1.32.13-1.92.39a4.894 4.894 0 0 0-2.96 4.49v1.95c0 .24.02.47.05.71.22 3.18 1.92 4.88 5.1 5.09.23.03.46.05.71.05h7.8c3.7 0 5.65-1.76 5.84-5.26.01-.19.02-.39.02-.59V14.2a4.9 4.9 0 0 0-3.47-4.68Zm-3.79 7.23h-5c-.41 0-.75-.34-.75-.75s.34-.75.75-.75h5c.41 0 .75.34.75.75s-.34.75-.75.75Z" fill="currentColor"/>'],
+  /* added for the dashboard */
+  Add: ['<path d="M6 12h12M12 18V6" stroke="currentColor" stroke-width="1.5" stroke-linecap="round" stroke-linejoin="round"/>',
+    '<path d="M16.19 2H7.81C4.17 2 2 4.17 2 7.81v8.37C2 19.83 4.17 22 7.81 22h8.37c3.64 0 5.81-2.17 5.81-5.81V7.81C22 4.17 19.83 2 16.19 2ZM18 12.75h-5.25V18c0 .41-.34.75-.75.75s-.75-.34-.75-.75v-5.25H6c-.41 0-.75-.34-.75-.75s.34-.75.75-.75h5.25V6c0-.41.34-.75.75-.75s.75.34.75.75v5.25H18c.41 0 .75.34.75.75s-.34.75-.75.75Z" fill="currentColor"/>'],
+  ArrowDown: ['<path stroke="currentColor" stroke-linecap="round" stroke-linejoin="round" stroke-miterlimit="10" stroke-width="1.5" d="M18.07 14.43L12 20.5l-6.07-6.07M12 3.5v16.83"/>',
+    '<path fill="currentColor" d="M16.19 2H7.81C4.17 2 2 4.17 2 7.81v8.37C2 19.83 4.17 22 7.81 22h8.37c3.64 0 5.81-2.17 5.81-5.81V7.81C22 4.17 19.83 2 16.19 2zm.63 12.24l-4.29 4.29a.75.75 0 01-1.06 0l-4.29-4.29a.754.754 0 010-1.06c.29-.29.77-.29 1.06 0l3.01 3.01V6c0-.41.34-.75.75-.75s.75.34.75.75v10.19l3.01-3.01c.29-.29.77-.29 1.06 0 .15.15.22.34.22.53s-.08.39-.22.53z"/>'],
+  ArrowRight2: ['<path stroke="currentColor" stroke-linecap="round" stroke-linejoin="round" stroke-miterlimit="10" stroke-width="1.5" d="M8.91 19.92l6.52-6.52c.77-.77.77-2.03 0-2.8L8.91 4.08"/>',
+    '<path fill="currentColor" d="M15.2 10.492l-1.97-1.97-3.21-3.21c-.68-.67-1.84-.19-1.84.77v11.84c0 .96 1.16 1.44 1.84.76l5.18-5.18c.83-.82.83-2.18 0-3.01z"/>'],
+  ArrowUp: ['<path stroke="currentColor" stroke-linecap="round" stroke-linejoin="round" stroke-miterlimit="10" stroke-width="1.5" d="M18.07 9.57L12 3.5 5.93 9.57M12 20.5V3.67"/>',
+    '<path fill="currentColor" d="M16.19 2H7.81C4.17 2 2 4.17 2 7.81v8.37C2 19.83 4.17 22 7.81 22h8.37c3.64 0 5.81-2.17 5.81-5.81V7.81C22 4.17 19.83 2 16.19 2zm.63 8.82c-.29.29-.77.29-1.06 0l-3.01-3.01V18c0 .41-.34.75-.75.75s-.75-.34-.75-.75V7.81l-3.01 3.01c-.29.29-.77.29-1.06 0a.742.742 0 01-.22-.53c0-.19.08-.39.22-.53l4.29-4.29a.75.75 0 011.06 0l4.29 4.29c.29.29.29.76 0 1.06z"/>'],
+  Bank: ['<path d="m12.37 2.15 9 3.6c.35.14.63.56.63.93V10c0 .55-.45 1-1 1H3c-.55 0-1-.45-1-1V6.68c0-.37.28-.79.63-.93l9-3.6c.2-.08.54-.08.74 0ZM22 22H2v-3c0-.55.45-1 1-1h18c.55 0 1 .45 1 1v3ZM4 18v-7M8 18v-7M12 18v-7M16 18v-7M20 18v-7M1 22h22" stroke="currentColor" stroke-width="1.5" stroke-miterlimit="10" stroke-linecap="round" stroke-linejoin="round"/><path d="M12 8.5a1.5 1.5 0 1 0 0-3 1.5 1.5 0 0 0 0 3Z" stroke="currentColor" stroke-width="1.5" stroke-miterlimit="10" stroke-linecap="round" stroke-linejoin="round"/>',
+    '<path d="M22 19v3H2v-3c0-.55.45-1 1-1h18c.55 0 1 .45 1 1Z" fill="currentColor" stroke="currentColor" stroke-width="1.5" stroke-miterlimit="10" stroke-linecap="round" stroke-linejoin="round"/><path d="M7 11H5v7h2v-7ZM11 11H9v7h2v-7ZM15 11h-2v7h2v-7ZM19 11h-2v7h2v-7ZM23 22.75H1c-.41 0-.75-.34-.75-.75s.34-.75.75-.75h22c.41 0 .75.34.75.75s-.34.75-.75.75ZM21.37 5.75l-9-3.6c-.2-.08-.54-.08-.74 0l-9 3.6c-.35.14-.63.55-.63.93V10c0 .55.45 1 1 1h18c.55 0 1-.45 1-1V6.68c0-.38-.28-.79-.63-.93ZM12 8.5c-.83 0-1.5-.67-1.5-1.5s.67-1.5 1.5-1.5 1.5.67 1.5 1.5-.67 1.5-1.5 1.5Z" fill="currentColor"/>'],
+  Graph: ['<path d="M18.32 12c2.6 0 3.68-1 2.72-4.28-.65-2.21-2.55-4.11-4.76-4.76C13 2 12 3.08 12 5.68v2.88C12 11 13 12 15 12h3.32Z" stroke="currentColor" stroke-width="1.5" stroke-linecap="round" stroke-linejoin="round"/><path d="M20 14.7a9.091 9.091 0 0 1-10.42 7.17c-3.79-.61-6.84-3.66-7.46-7.45A9.1 9.1 0 0 1 9.26 4.01" stroke="currentColor" stroke-width="1.5" stroke-linecap="round" stroke-linejoin="round"/>',
+    '<path d="M21.67 6.95c-.64-2.17-2.45-3.98-4.62-4.62-1.65-.48-2.79-.44-3.58.15-.95.71-1.06 1.99-1.06 2.9v2.49c0 2.46 1.12 3.71 3.32 3.71h2.87c.9 0 2.19-.11 2.9-1.06.61-.78.66-1.92.17-3.57Z" fill="currentColor"/><path d="M18.91 13.361c-.26-.3-.64-.47-1.03-.47H14.3c-1.76 0-3.19-1.43-3.19-3.19v-3.58c0-.39-.17-.77-.47-1.03-.29-.26-.69-.38-1.07-.33-2.35.3-4.51 1.59-5.92 3.53-1.42 1.95-1.94 4.33-1.49 6.71.65 3.44 3.4 6.19 6.85 6.84.55.11 1.1.16 1.65.16 1.81 0 3.56-.56 5.05-1.65 1.94-1.41 3.23-3.57 3.53-5.92.05-.39-.07-.78-.33-1.07Z" fill="currentColor"/>'],
+  EmptyWallet: ['<path d="M18.04 13.55c-.42.41-.66 1-.6 1.63.09 1.08 1.08 1.87 2.16 1.87h1.9v1.19c0 2.07-1.69 3.76-3.76 3.76H6.26c-2.07 0-3.76-1.69-3.76-3.76v-6.73c0-2.07 1.69-3.76 3.76-3.76h11.48c2.07 0 3.76 1.69 3.76 3.76v1.44h-2.02c-.56 0-1.07.22-1.44.6Z" stroke="currentColor" stroke-width="1.5" stroke-linecap="round" stroke-linejoin="round"/><path d="M2.5 12.41V7.84c0-1.19.73-2.25 1.84-2.67l7.94-3a1.9 1.9 0 0 1 2.57 1.78v3.8M22.559 13.97v2.06c0 .55-.44 1-1 1.02h-1.96c-1.08 0-2.07-.79-2.16-1.87-.06-.63.18-1.22.6-1.63.37-.38.88-.6 1.44-.6h2.08c.56.02 1 .47 1 1.02ZM7 12h7" stroke="currentColor" stroke-width="1.5" stroke-linecap="round" stroke-linejoin="round"/>',
+    '<path d="M14.85 3.95v3.8h-1.5v-3.8c0-.27-.24-.4-.4-.4-.05 0-.1.01-.15.03L4.87 6.57c-.53.2-.87.7-.87 1.27v.67c-.91.68-1.5 1.77-1.5 3V7.84c0-1.19.73-2.25 1.84-2.67l7.94-3c.22-.08.45-.12.67-.12 1 0 1.9.81 1.9 1.9ZM21.5 14.5v1a.5.5 0 0 1-.49.5h-1.46c-.53 0-1.01-.39-1.05-.91-.03-.31.09-.6.29-.8a.95.95 0 0 1 .7-.29H21c.29.01.5.23.5.5Z" fill="currentColor"/><path d="M19.48 12.95h1.02c.55 0 1-.45 1-1v-.44c0-2.07-1.69-3.76-3.76-3.76H6.26c-.85 0-1.63.28-2.26.76-.91.68-1.5 1.77-1.5 3v6.73C2.5 20.31 4.19 22 6.26 22h11.48c2.07 0 3.76-1.69 3.76-3.76v-.19c0-.55-.45-1-1-1h-.87c-.96 0-1.88-.59-2.13-1.52-.21-.76.04-1.49.54-1.98.37-.38.88-.6 1.44-.6Zm-5.48-.2H7c-.41 0-.75-.34-.75-.75s.34-.75.75-.75h7c.41 0 .75.34.75.75s-.34.75-.75.75Z" fill="currentColor"/>']
 };
 const SIDE_ICONS = {
   dashboard: ISX.Home2,
@@ -538,6 +553,7 @@ async function route() {
   // the drop-down holding the open screen is shown open, so the highlighted entry can be seen
   document.querySelectorAll('#nav .nav-drop').forEach(d => { if (d.querySelector('a.active')) openDrop(d, true); });
   $('#title').textContent = TITLES[key];
+  document.body.dataset.view = key;   // lets style.css give a screen its own header (the dashboard has a greeting instead)
   const el = $('#view');
   el.innerHTML = '<div class="empty">Loading…</div>';
   try { await view(el, arg); }
@@ -548,115 +564,200 @@ window.addEventListener('hashchange', route);
 /* ------------------------------------------------------------------ dashboard */
 const stat = (cls, l, v) => `<div class="stat ${cls}"><div class="l">${esc(l)}</div><div class="v">${v}</div></div>`;
 
-/** Big amounts shortened for the cards and chart axis: 4.22 bn, 15.3 m, 250 k (the full figure shows on hover). */
+/** Big amounts shortened for the cards and chart axis: 4.22B, 15.3M, 80M, 250K (the full figure shows on hover). */
 const compact = n => {
   const v = Number(n || 0), a = Math.abs(v);
-  return a >= 1e9 ? (v / 1e9).toFixed(2) + ' bn' : a >= 1e6 ? (v / 1e6).toFixed(1) + ' m' : a >= 1e3 ? Math.round(v / 1e3) + ' k' : String(Math.round(v));
+  const trim = s => s.replace(/\.?0+$/, '');
+  return a >= 1e9 ? trim((v / 1e9).toFixed(2)) + 'B' : a >= 1e6 ? trim((v / 1e6).toFixed(1)) + 'M' : a >= 1e3 ? Math.round(v / 1e3) + 'K' : String(Math.round(v));
 };
 
-/** A figure card with an icon: the short amount large, the full amount on hover, a small line under it. */
-const kpi = (icon, label, value, full, sub, href) =>
-  `<${href ? `a href="${href}"` : 'div'} class="kpi"${full ? ` title="${esc(full)}"` : ''}>` +
-  `<span class="kpi-ic"><svg viewBox="0 0 24 24" aria-hidden="true">${ICONS[icon] || ''}</svg></span>` +
-  `<span class="kpi-txt"><span class="kpi-l">${esc(label)}</span><span class="kpi-v">${value}</span>${sub ? `<span class="kpi-s">${sub}</span>` : ''}</span>` +
-  `</${href ? 'a' : 'div'}>`;
+/** A big amount in three parts: "UGX" small, the number large, then B / M / K small. */
+const amountHtml = n => {
+  const [, num, unit] = compact(n).match(/^(-?[\d.]+)([BMK]?)$/);
+  return `<span class="amt-cur">UGX</span>${esc(num)}${unit ? `<span class="amt-unit">${esc(unit)}</span>` : ''}`;
+};
 
-/** Money in (blue) and money out (black) for each month, as bars with a tooltip; the figures are also given as a table below it. */
+/** One of the three tinted cards at the top: a white disc with a filled icon, the label, the figure and a small line under it. */
+const heroCard = (icon, label, valueHtml, full, sub, href) =>
+  `<a class="hero" href="${href}"${full ? ` title="${esc(full)}"` : ''}>` +
+  `<span class="hero-ic">${svgOf(ISX[icon][1], '')}</span>` +
+  `<span class="hero-txt"><span class="hero-l">${esc(label)}</span><span class="hero-v">${valueHtml}</span><span class="hero-s">${sub}</span></span>` +
+  `<span class="hero-go">${svgOf(ISX.ArrowRight2[0], '')}</span></a>`;
+
+/** One figure in the white cards under the tinted ones: label, figure, small line, and sometimes a ring on the right.
+    No icon; the label says it all. A small arrow after the label shows on hover. */
+const stripCell = (label, valueHtml, full, sub, href, ringHtml = '') =>
+  `<a class="strip-cell" href="${href}"${full ? ` title="${esc(full)}"` : ''}>` +
+  `<span class="strip-txt"><span class="strip-l">${esc(label)}${svgOf(ISX.ArrowRight2[0], 'strip-go')}</span>` +
+  `<span class="strip-v">${valueHtml}</span><span class="strip-s">${sub}</span></span>${ringHtml}</a>`;
+
+/** A round progress ring with its percentage beside it and a short caption under that (as in the reference's tracker).
+    The ring stops at full; the number shows the true figure, even above 100%. */
+const ring = (pct, caption, cls) => {
+  const p = Math.max(0, Math.round(pct)), arc = Math.min(100, p);
+  return `<span class="ring ${cls}"><svg viewBox="0 0 44 44" aria-hidden="true"><circle class="ring-t" cx="22" cy="22" r="18"/>` +
+    `<circle class="ring-v" cx="22" cy="22" r="18" pathLength="100" style="--arc:${arc}"/></svg>` +
+    `<span class="ring-txt"><b>${p}%</b><small>${esc(caption)}</small></span></span>`;
+};
+
+/** Two letters for a round name badge. */
+const initials = name => {
+  const parts = String(name || '?').trim().split(/\s+/);
+  return (parts.length > 1 ? parts[0][0] + parts[parts.length - 1][0] : parts[0].slice(0, 2)).toUpperCase();
+};
+
+/** Money in (CPA blue) and money out (navy) for each month. Bars are hatched and pale; the month in focus
+    (this month, or the one under the pointer) turns solid and shows its money in above the bars.
+    A dashed yellow line marks the average money in. The figures are also given as a table below it. */
 function flowChart(months) {
-  const W = 720, H = 250, L = 52, R = 8, T = 12, B = 30;
+  const W = 760, H = 290, L = 46, R = 6, T = 34, B = 34;
   const max = Math.max(1, ...months.flatMap(m => [Number(m.moneyIn), Number(m.moneyOut)]));
-  // a round top for the axis: 1, 2 or 5 times a power of ten, four lines
-  const raw = max / 4, p = Math.pow(10, Math.floor(Math.log10(raw))), step = [1, 2, 5, 10].map(x => x * p).find(x => x >= raw);
+  // a round top for the axis: 1, 2 or 5 times a power of ten, four steps of at least one shilling
+  const raw = max / 4, p = Math.pow(10, Math.floor(Math.log10(raw))), step = Math.max(1, [1, 2, 5, 10].map(x => x * p).find(x => x >= raw));
   const top = step * 4, y = v => T + (H - T - B) * (1 - v / top);
-  const slot = (W - L - R) / months.length, bw = Math.min(18, (slot - 10) / 2);
+  const slot = (W - L - R) / months.length, bw = Math.min(20, (slot - 14) / 2), gap = 4;
   const bar = (x, v, cls) => {
-    const h = Math.max(0, y(0) - y(v)); if (h < 0.5) return '';
-    const r = Math.min(4, h, bw / 2), yt = y(v), yb = y(0);
-    return `<path class="${cls}" d="M${x},${yb}V${yt + r}Q${x},${yt} ${x + r},${yt}H${x + bw - r}Q${x + bw},${yt} ${x + bw},${yt + r}V${yb}Z"/>`;
+    const h = y(0) - y(v);
+    // a month with nothing shows a small flat stub, so the gap reads as "none" rather than "missing"
+    if (h < 3) return `<rect class="stub" x="${x}" y="${y(0) - 4}" width="${bw}" height="4" rx="2"/>`;
+    const r = Math.min(6, h / 2, bw / 2), yt = y(v), yb = y(0);
+    return `<path class="bar ${cls}" d="M${x},${yb}V${yt + r}Q${x},${yt} ${x + r},${yt}H${x + bw - r}Q${x + bw},${yt} ${x + bw},${yt + r}V${yb}Z"/>`;
   };
-  let svg = '';
+  let svg = `<defs>` +
+    `<pattern id="hatchIn" width="6" height="6" patternUnits="userSpaceOnUse" patternTransform="rotate(45)"><rect width="6" height="6" class="hatch-in"/><line x1="0" y1="0" x2="0" y2="6" class="hatch-line"/></pattern>` +
+    `<pattern id="hatchOut" width="6" height="6" patternUnits="userSpaceOnUse" patternTransform="rotate(45)"><rect width="6" height="6" class="hatch-out"/><line x1="0" y1="0" x2="0" y2="6" class="hatch-line"/></pattern></defs>`;
   for (let i = 0; i <= 4; i++) {
     const v = step * i;
-    svg += `<line class="grid" x1="${L}" x2="${W - R}" y1="${y(v)}" y2="${y(v)}"/><text class="ax" x="${L - 6}" y="${y(v) + 4}" text-anchor="end">${compact(v)}</text>`;
+    svg += `<text class="ax" x="${L - 10}" y="${y(v) + 4}" text-anchor="end">${compact(v)}</text>`;
+  }
+  // the average money in, as a dashed line with a small yellow tag at its left end
+  let avgTag = '';
+  const avg = months.reduce((a, m) => a + Number(m.moneyIn), 0) / months.length;
+  if (avg > 0) {
+    const ya = y(avg);
+    svg += `<line class="avg" x1="${L}" x2="${W - R}" y1="${ya}" y2="${ya}"/>`;
+    avgTag = `<rect class="avg-tag" x="${L - 2}" y="${ya - 10}" width="36" height="20" rx="10"/><text class="avg-txt" x="${L + 16}" y="${ya + 4}" text-anchor="middle">avg</text>`;
   }
   months.forEach((m, i) => {
-    const x0 = L + slot * i + (slot - bw * 2 - 2) / 2;
+    const x0 = L + slot * i + (slot - bw * 2 - gap) / 2, cx = L + slot * i + slot / 2;
     const [mon, yr] = m.label.split(' ');
-    svg += bar(x0, Number(m.moneyIn), 'in') + bar(x0 + bw + 2, Number(m.moneyOut), 'out') +
-      `<text class="ax" x="${L + slot * i + slot / 2}" y="${H - 10}" text-anchor="middle">${esc(mon)}${i === 0 || mon === 'Jan' ? ' ' + esc(yr.slice(2)) : ''}</text>` +
-      `<rect class="hit" data-i="${i}" x="${L + slot * i}" y="${T}" width="${slot}" height="${H - T - B}"/>`;
+    const tall = y(Math.max(Number(m.moneyIn), Number(m.moneyOut)));
+    const tag = compact(m.moneyIn), tw = tag.length * 7 + 20;
+    svg += `<g class="mo" data-i="${i}" style="--i:${i}">` +
+      bar(x0, Number(m.moneyIn), 'in') + bar(x0 + bw + gap, Number(m.moneyOut), 'out') +
+      (Number(m.moneyIn) > 0 ? `<g class="vtag"><rect x="${cx - tw / 2}" y="${Math.max(2, tall - 30)}" width="${tw}" height="22" rx="11"/>` +
+        `<text x="${cx}" y="${Math.max(2, tall - 30) + 15}" text-anchor="middle">${esc(tag)}</text></g>` : '') +
+      `<text class="ax mlab" x="${cx}" y="${H - 10}" text-anchor="middle">${esc(mon)}${i === 0 || mon === 'Jan' ? ' ' + esc(yr.slice(2)) : ''}</text>` +
+      `<rect class="hit" x="${L + slot * i}" y="0" width="${slot}" height="${H}"/></g>`;
   });
-  return `<div class="chart-wrap"><svg class="chart" viewBox="0 0 ${W} ${H}" role="img" aria-label="Money in and out for the last twelve months">${svg}</svg>` +
+  return `<div class="chart-wrap"><svg class="chart" viewBox="0 0 ${W} ${H}" role="img" aria-label="Money in and out for the last twelve months">${svg}${avgTag}</svg>` +
     `<div class="chart-tip" hidden></div></div>`;
 }
+
+/** The icon for a cash, bank or mobile money account, from its name. */
+const accountIcon = name => /mobile|momo|mtn|airtel/i.test(name) ? 'Mobile' : /bank|stanbic|centenary|dfcu|absa|equity|housing/i.test(name) ? 'Bank' : 'EmptyWallet';
 
 views.dashboard = async el => {
   const d = await api('/api/reports/dashboard');
   const hour = new Date().getHours();
   const hello = hour < 12 ? 'Good morning' : hour < 17 ? 'Good afternoon' : 'Good evening';
   const first = String(S.me.fullName || S.me.username).split(/[\s,]+/)[0];
-  const ugx = n => 'UGX ' + compact(n);
+  const full = n => 'UGX ' + money(n);
+  const count = n => Number(n).toLocaleString('en-US');
   const thisMonth = d.months[d.months.length - 1];
-  el.innerHTML =
-    `<div class="dash-hello"><div><h3>${esc(hello)}, ${esc(first)}</h3>` +
-    `<p class="muted">${esc(new Date().toLocaleDateString('en-GB', { weekday: 'long', day: 'numeric', month: 'long', year: 'numeric' }))}</p></div>` +
-    (isMgr() ? '' : `<div class="quick"><a class="btn primary" href="#deposits">+ Regular deposit</a><a class="btn" href="#loans">Loan applications</a>` +
-      `<a class="btn" href="#members">Member list</a><a class="btn" href="#reports/cashbook-receipts">Cashbook</a></div>`) + `</div>` +
+  const inactive = d.members - d.activeMembers;
+  const savings = Number(d.savings);   // the rings under the tinted cards compare loans and cash with members' savings
+  // an account's part of all the cash and bank money, as a whole percentage (an overdrawn account counts as none)
+  const share = b => Number(d.cashTotal) > 0 ? Math.max(0, Math.round(Number(b) / Number(d.cashTotal) * 100)) : 0;
 
-    `<div class="kpis">` +
-    kpi('members', 'Members', d.members.toLocaleString('en-US'), '', `${d.activeMembers.toLocaleString('en-US')} active`, '#members') +
-    kpi('deposits', 'Savings', ugx(d.savings), 'UGX ' + money(d.savings), `${d.savers.toLocaleString('en-US')} savers · interest owed ${compact(d.savingsInterest)}`, '#reports/savings-report') +
-    kpi('reports/shares-report', 'Shares', ugx(d.shares), 'UGX ' + money(d.shares), 'paid-up share capital', '#reports/shares-report') +
-    kpi('loans', 'Loans outstanding', ugx(d.loans), 'UGX ' + money(d.loans), `${d.borrowers.toLocaleString('en-US')} borrowers`, '#reports/loan-report') +
-    kpi('interest', 'Loan interest owed', ugx(d.loanInterest), 'UGX ' + money(d.loanInterest), 'charged, not yet paid', '#reports/loan-report') +
-    kpi('payroll', 'Cash & bank', ugx(d.cashTotal), 'UGX ' + money(d.cashTotal), `${d.cash.length} accounts`, '#reports/cashbook-receipts') +
+  el.innerHTML = `<div class="dash">` +
+    `<header class="dash-top">` +
+    `<div class="dash-hello"><h1>${esc(hello)}, ${esc(first)}</h1><span class="vr" aria-hidden="true"></span>` +
+    `<span class="dash-date">${esc(new Date().toLocaleDateString('en-GB', { weekday: 'long', day: 'numeric', month: 'long' }))}</span></div>` +
+    (isMgr() ? '' : `<nav class="dash-actions" aria-label="Quick links">` +
+      `<a class="dash-link" href="#loans">${svgOf(ISX.MoneyTime[0], '')}Loan applications${d.pendingLoans ? `<span class="dash-count">${count(d.pendingLoans)}</span>` : ''}</a>` +
+      `<span class="vr" aria-hidden="true"></span>` +
+      `<a class="dash-link" href="#members">${svgOf(ISX.Profile2User[0], '')}Member list</a>` +
+      `<span class="vr" aria-hidden="true"></span>` +
+      `<a class="dash-link" href="#reports/cashbook-receipts">${svgOf(ISX.MoneyRecive[0], '')}Cashbook</a>` +
+      `<a class="dash-cta" href="#deposits">${svgOf(ISX.Add[0], '')}Regular deposit</a></nav>`) +
+    `</header>` +
+
+    `<div class="heroes">` +
+    heroCard('Profile2User', 'Members', count(d.members), '', `${count(d.activeMembers)} active`, '#members') +
+    heroCard('EmptyWallet', 'Savings', amountHtml(d.savings), full(d.savings), `${count(d.savers)} savers · interest owed ${compact(d.savingsInterest)}`, '#reports/savings-report') +
+    heroCard('Graph', 'Shares', amountHtml(d.shares), full(d.shares), 'paid-up share capital', '#reports/shares-report') +
     `</div>` +
-
-    `<div class="dash-grid">` +
-    `<div class="panel"><div class="panel-head"><h3>Money in and out · last 12 months</h3>` +
-    `<div class="legend"><span><i class="sw in"></i>Money in from members</span><span><i class="sw out"></i>Money out to members</span></div></div>` +
-    flowChart(d.months) +
-    `<p class="muted small-note">This month so far: in <strong>UGX ${money(thisMonth.moneyIn)}</strong>, out <strong>UGX ${money(thisMonth.moneyOut)}</strong>. ` +
-    `In: savings, shares, membership and loan repayments. Out: withdrawals, refunds and loans paid out.</p>` +
-    `<details class="figs"><summary>Show the figures</summary>` + table([
-      { h: 'Month', f: r => esc(r.label) }, { h: 'Money in', num: 1, f: r => money(r.moneyIn) }, { h: 'Money out', num: 1, f: r => money(r.moneyOut) },
-      { h: 'Difference', num: 1, f: r => money(Number(r.moneyIn) - Number(r.moneyOut)) }], d.months) + `</details></div>` +
-
-    `<div class="panel"><h3>Cash and bank</h3>` +
-    (d.cash.length ? `<div class="cash-list">${d.cash.map(c => `<div class="cash-row"><span><strong>${esc(c.code)}</strong> ${esc(c.name)}</span>` +
-      `<span class="num">${money(c.balance)}</span></div>`).join('')}` +
-      `<div class="cash-row total"><span>Total</span><span class="num">${money(d.cashTotal)}</span></div></div>` : '<div class="empty">Nothing held yet.</div>') +
+    // the two loan figures share a card; cash & bank has its own, under the third tinted card
+    `<div class="strip">` +
+    `<div class="strip-group loans">` +
+    stripCell('Loans outstanding', amountHtml(d.loans), full(d.loans), `${count(d.borrowers)} borrowers`, '#reports/loan-report',
+      savings > 0 ? ring(Number(d.loans) / savings * 100, 'of savings lent out', 'lent') : '') +
+    stripCell('Loan interest owed', amountHtml(d.loanInterest), full(d.loanInterest), 'charged, not yet paid', '#reports/loan-report') +
+    `</div><div class="strip-group">` +
+    stripCell('Cash & bank', amountHtml(d.cashTotal), full(d.cashTotal), `${d.cash.length} account${d.cash.length === 1 ? '' : 's'}`, '#reports/cashbook-receipts',
+      savings > 0 ? ring(Number(d.cashTotal) / savings * 100, 'of savings on hand', 'held') : '') +
     `</div></div>` +
 
     `<div class="dash-grid">` +
-    `<div class="panel"><h3>Latest money in and out</h3>` + table([
-      { h: 'Date', f: r => esc(r.date) },
-      { h: 'Member', f: r => `${esc(r.memberNo)} – ${esc(r.memberName)}` },
-      { h: 'What', f: r => `<span class="badge ${r.moneyIn ? 'in' : 'out'}">${r.moneyIn ? '↓ In' : '↑ Out'}</span> ${esc(r.type)}` },
-      { h: 'Amount', num: 1, f: r => money(r.amount) }], d.recent) + `</div>` +
-    `<div class="panel"><h3>Needs attention</h3><div class="todo">` +
-    `<a class="todo-row" href="#loans"><span class="todo-n">${d.pendingLoans}</span><span>loan application${d.pendingLoans === 1 ? '' : 's'} waiting for a decision</span></a>` +
-    `<a class="todo-row" href="#members"><span class="todo-n">${(d.members - d.activeMembers).toLocaleString('en-US')}</span><span>inactive member${d.members - d.activeMembers === 1 ? '' : 's'}</span></a>` +
-    `<a class="todo-row" href="#reports/savings-report"><span class="todo-n">${compact(d.savingsInterest)}</span><span>savings interest owed to members (UGX)</span></a>` +
-    `</div></div></div>` +
-    (S.single ? '' : '<div id="branchSummary"></div>');
+    `<section class="card chart-card">` +
+    `<div class="card-head"><h3>Money in and out</h3><span class="vr" aria-hidden="true"></span><span class="card-sub">Last 12 months</span>` +
+    `<div class="flow-now" title="${esc(full(thisMonth.moneyIn))}"><span class="flow-v">${amountHtml(thisMonth.moneyIn)}</span><span class="flow-l">in this month</span></div></div>` +
+    `<div class="legend"><span><i class="sw in"></i>Money in from members</span><span><i class="sw out"></i>Money out to members</span></div>` +
+    flowChart(d.months) +
+    `<p class="small-note">This month so far: in <strong>UGX ${money(thisMonth.moneyIn)}</strong>, out <strong>UGX ${money(thisMonth.moneyOut)}</strong>. ` +
+    `In: savings, shares, membership and loan repayments. Out: withdrawals, refunds and loans paid out.</p>` +
+    `<details class="figs"><summary>Show the figures</summary>` + table([
+      { h: 'Month', f: r => esc(r.label) }, { h: 'Money in', num: 1, f: r => money(r.moneyIn) }, { h: 'Money out', num: 1, f: r => money(r.moneyOut) },
+      { h: 'Difference', num: 1, f: r => money(Number(r.moneyIn) - Number(r.moneyOut)) }], d.months) + `</details></section>` +
 
-  // the chart's tooltip: the month under the pointer, with both figures
-  const wrap = $('.chart-wrap', el), tip = $('.chart-tip', el);
-  wrap.querySelectorAll('.hit').forEach(h => {
-    h.addEventListener('mouseenter', () => {
-      const m = d.months[Number(h.dataset.i)];
+    `<section class="card cash-card"><div class="card-head"><h3>Cash and bank</h3></div>` +
+    (d.cash.length ? `<div class="accts">${d.cash.map(c => `<div class="acct"><span class="acct-ic">${svgOf(ISX[accountIcon(c.name)][0], '')}</span>` +
+      `<span class="acct-txt"><strong>${esc(c.name)}</strong><small>${esc(c.code)} · ${share(c.balance)}% of the total</small>` +
+      `<span class="acct-bar" aria-hidden="true"><i style="width:${share(c.balance)}%"></i></span></span><span class="num">${money(c.balance)}</span></div>`).join('')}` +
+      `<div class="acct total"><span>Total</span><span class="num">${money(d.cashTotal)}</span></div></div>`
+      : `<div class="dash-empty">${svgOf(ISX.EmptyWallet[0], '')}<span>Nothing held yet.</span></div>`) +
+    `</section></div>` +
+
+    `<div class="dash-grid lower">` +
+    `<section class="tracker"><div class="tracker-head"><h3>Latest money in and out</h3>${d.recent.length ? `<span class="dash-count soft">${d.recent.length}</span>` : ''}</div>` +
+    table([
+      { h: 'Date', f: r => `<span class="t-date">${esc(r.date)}</span>` },
+      { h: 'Member', f: r => `<span class="who"><span class="who-av t${(String(r.memberNo).length + String(r.memberName).length) % 3}">${esc(initials(r.memberName))}</span>` +
+        `<span><strong>${esc(r.memberName)}</strong><small>${esc(r.memberNo)}</small></span></span>` },
+      { h: 'What', f: r => `<span class="flow-tag ${r.moneyIn ? 'in' : 'out'}">${svgOf((r.moneyIn ? ISX.ArrowDown : ISX.ArrowUp)[0], '')}${r.moneyIn ? 'In' : 'Out'}</span> ${esc(r.type)}` },
+      { h: 'Amount', num: 1, f: r => `<strong>${money(r.amount)}</strong>` }], d.recent) + `</section>` +
+    `<section class="card"><div class="card-head"><h3>Needs attention</h3></div><div class="todo">` +
+    `<a class="todo-row${d.pendingLoans ? ' hot' : ''}" href="#loans"><span class="todo-n">${count(d.pendingLoans)}</span>` +
+    `<span class="todo-t">loan application${d.pendingLoans === 1 ? '' : 's'} waiting for a decision</span>${svgOf(ISX.ArrowRight2[0], 'todo-go')}</a>` +
+    `<a class="todo-row" href="#members"><span class="todo-n">${count(inactive)}</span>` +
+    `<span class="todo-t">inactive member${inactive === 1 ? '' : 's'}</span>${svgOf(ISX.ArrowRight2[0], 'todo-go')}</a>` +
+    `<a class="todo-row" href="#reports/savings-report"><span class="todo-n">${compact(d.savingsInterest)}</span>` +
+    `<span class="todo-t">savings interest owed to members (UGX)</span>${svgOf(ISX.ArrowRight2[0], 'todo-go')}</a>` +
+    `</div></section></div>` +
+    (S.single ? '' : '<div id="branchSummary"></div>') +
+    `</div>`;
+
+  // the chart: the month under the pointer comes into focus with a tooltip; leaving the chart returns focus to this month
+  const wrap = $('.chart-wrap', el), tip = $('.chart-tip', el), groups = [...wrap.querySelectorAll('.mo')];
+  const focus = i => groups.forEach((g, j) => g.classList.toggle('on', j === i));
+  const place = e => {
+    const box = wrap.getBoundingClientRect();
+    tip.style.left = Math.min(box.width - tip.offsetWidth - 4, Math.max(4, e.clientX - box.left + 14)) + 'px';
+    tip.style.top = Math.max(4, e.clientY - box.top - tip.offsetHeight - 12) + 'px';
+  };
+  focus(groups.length - 1);
+  groups.forEach((g, i) => {
+    g.addEventListener('mouseenter', e => {
+      const m = d.months[i];
       tip.innerHTML = `<strong>${esc(m.label)}</strong><span><i class="sw in"></i>In ${money(m.moneyIn)}</span><span><i class="sw out"></i>Out ${money(m.moneyOut)}</span>`;
       tip.hidden = false;
-      h.classList.add('on');
+      focus(i);
+      place(e);
     });
-    h.addEventListener('mousemove', e => {
-      const box = wrap.getBoundingClientRect();
-      tip.style.left = Math.min(box.width - tip.offsetWidth - 4, Math.max(4, e.clientX - box.left + 12)) + 'px';
-      tip.style.top = Math.max(4, e.clientY - box.top - tip.offsetHeight - 10) + 'px';
-    });
-    h.addEventListener('mouseleave', () => { tip.hidden = true; h.classList.remove('on'); });
+    g.addEventListener('mousemove', place);
   });
+  wrap.addEventListener('mouseleave', () => { tip.hidden = true; focus(groups.length - 1); });
 
   if (!S.single) await branchSummary($('#branchSummary'));
 };
