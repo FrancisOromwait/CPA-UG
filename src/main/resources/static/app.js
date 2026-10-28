@@ -272,6 +272,65 @@ $('#scrim').addEventListener('click', () => openSide(false));
 $('#nav').addEventListener('click', e => { if(phone.matches && e.target.closest('a')) openSide(false); });
 document.addEventListener('keydown', e => { if(e.key === 'Escape' && $('#app').classList.contains('nav-open')) openSide(false); });
 
+// the initials on the right of the bar open the menu with the account options (change password, sign out) showing
+$('#mbarMe').addEventListener('click', e =>
+    {
+        e.stopPropagation();
+        openSide(true);
+        showMeMenu(true);
+    });
+
+// the bar picks up a soft shadow once the page has moved under it
+const markScrolled = () => $('#app').classList.toggle('scrolled', window.scrollY > 4);
+window.addEventListener('scroll', markScrolled, { passive: true });
+
+/* The open menu follows a finger dragged to the left and closes if it's let go far enough along or with a flick;
+   otherwise it slides back. Up and down still scrolls the menu (touch-action in style.css). */
+const drawer = $('#side');
+let drag = null;
+drawer.addEventListener('pointerdown', e =>
+    {
+        if(!phone.matches || e.pointerType === 'mouse' || !$('#app').classList.contains('nav-open')) return;
+        drag = { id: e.pointerId, x0: e.clientX, y0: e.clientY, dx: 0, t: e.timeStamp, v: 0, on: false };
+    });
+drawer.addEventListener('pointermove', e =>
+    {
+        if(!drag || e.pointerId !== drag.id) return;
+        const dx = Math.min(0, e.clientX - drag.x0);
+        if(!drag.on)
+            {
+                // a little way first, and more sideways than up or down, before it counts as a drag
+                if(Math.abs(e.clientX - drag.x0) < 10 || Math.abs(e.clientX - drag.x0) < Math.abs(e.clientY - drag.y0)) return;
+                drag.on = true;
+                drawer.setPointerCapture(e.pointerId);
+                $('#app').classList.add('side-dragging');
+            }
+        // how fast it's going, in px per millisecond, from the last move
+        const dt = e.timeStamp - drag.t;
+        if(dt > 0) drag.v = (dx - drag.dx) / Math.max(8, dt);
+        drag.dx = dx;
+        drag.t = e.timeStamp;
+        drawer.style.transform = `translateX(${dx}px)`;
+        $('#scrim').style.opacity = String(1 + dx / drawer.offsetWidth);
+    });
+const dropDrag = e =>
+    {
+        if(!drag || e.pointerId !== drag.id) return;
+        const was = drag;
+        drag = null;
+        if(!was.on) return;
+        $('#app').classList.remove('side-dragging');
+        drawer.style.transform = '';
+        $('#scrim').style.opacity = '';
+        if(e.type !== 'pointercancel' && (was.dx < -drawer.offsetWidth / 3 || was.v < -0.4)) openSide(false);
+        // a drag isn't a tap: the link under the finger isn't followed
+        const eat = ev => { ev.preventDefault(); ev.stopPropagation(); };
+        drawer.addEventListener('click', eat, { capture: true, once: true });
+        setTimeout(() => drawer.removeEventListener('click', eat, { capture: true }), 350);
+    };
+drawer.addEventListener('pointerup', dropDrag);
+drawer.addEventListener('pointercancel', dropDrag);
+
 /* The names on the folded menu: a small black label beside the icon. The first one waits a moment,
    so it doesn't flash up as the mouse passes by; once one is showing, moving to the next icon swaps it over at once. */
 const sideTip = document.createElement('div');
@@ -556,6 +615,8 @@ function start() {
   // the phone's top bar carries the same logo and name
   $('#mbarMark').innerHTML = $('#brandMark').innerHTML.replace(/ aria-label="[^"]*"/, ' aria-hidden="true"');
   $('#mbarName').textContent = brand;
+  $('#mbarInitials').textContent = $('#whoInitials').textContent;
+  $('#mbarMe').title = $('#meBtn').dataset.tip;
   document.title = isMgr() ? `${S.appName} · Support` : brand;
   const scopeText = isMgr() ? 'All branches' : S.single ? '' : `Sacco ID ${S.me.branchCode}`;
   $('#scope').textContent = scopeText;
@@ -724,7 +785,7 @@ views.dashboard = async el => {
   el.innerHTML = `<div class="dash">` +
     `<header class="dash-top">` +
     `<div class="dash-hello"><h1>${esc(hello)}, ${esc(first)}</h1><span class="vr" aria-hidden="true"></span>` +
-    `<span class="dash-date">${esc(new Date().toLocaleDateString('en-GB', { weekday: 'long', day: 'numeric', month: 'long' }))}</span></div>` +
+    `<span class="dash-date">${esc(new Date().toLocaleDateString('en-GB', { weekday: 'long', day: 'numeric', month: 'long', year: 'numeric' }).replace(',', ''))}</span></div>` +
     (isMgr() ? '' : `<nav class="dash-actions" aria-label="Quick links">` +
       `<a class="dash-link" href="#loans">${svgOf(ISX.MoneyTime[0], '')}Loan applications${d.pendingLoans ? `<span class="dash-count">${count(d.pendingLoans)}</span>` : ''}</a>` +
       `<span class="vr" aria-hidden="true"></span>` +
@@ -811,6 +872,37 @@ function fitFlowChart(el, d, still = false) {
     tip.style.top = Math.max(4, e.clientY - box.top - tip.offsetHeight - 12) + 'px';
   };
   focus(groups.length - 1);
+  // a phone has no pointer to hover with: a finger drags across the chart instead (scrubbing, as in Apple's Stocks),
+  // and the big figure above it shows the month under the finger
+  if(phone.matches)
+      {
+          const readout = i =>
+              {
+                  const m = months[i], now = i === months.length - 1;
+                  $('.flow-v', el).innerHTML = amountHtml(m.moneyIn);
+                  $('.flow-l', el).textContent = now ? 'in this month' : `in ${m.label.split(' ')[0]}`;
+                  $('.flow-now', el).title = 'UGX ' + money(m.moneyIn);
+              };
+          let on = groups.length - 1, held = null;
+          const pick = x =>
+              {
+                  const i = held.findIndex(r => x < r.right);
+                  const next = i < 0 ? held.length - 1 : i;
+                  if(next === on) return;
+                  on = next;
+                  focus(on);
+                  readout(on);
+              };
+          readout(on);
+          wrap.addEventListener('pointerdown', e =>
+              {
+                  held = groups.map(g => $('.hit', g).getBoundingClientRect());
+                  pick(e.clientX);
+              });
+          wrap.addEventListener('pointermove', e => { if(held && (e.pointerType === 'mouse' ? e.buttons : true)) pick(e.clientX); });
+          ['pointerup', 'pointercancel'].forEach(t => wrap.addEventListener(t, () => held = null));
+          return;
+      }
   groups.forEach((g, i) => {
     const show = e => {
       const m = months[i];
@@ -820,14 +912,16 @@ function fitFlowChart(el, d, still = false) {
       place(e);
     };
     g.addEventListener('mouseenter', show);
-    g.addEventListener('click', show);   // a tap on a phone shows the month's figures too
     g.addEventListener('mousemove', place);
   });
   wrap.addEventListener('mouseleave', () => { tip.hidden = true; focus(groups.length - 1); });
 }
 
-let fitTimer;
+let fitTimer, fitWidth = window.innerWidth;
 window.addEventListener('resize', () => {
+  // a phone's address bar sliding away changes only the height: the chart (and a month picked on it) stays as it is
+  if (phone.matches && window.innerWidth === fitWidth) return;
+  fitWidth = window.innerWidth;
   clearTimeout(fitTimer);
   fitTimer = setTimeout(() => { if (document.body.dataset.view === 'dashboard' && lastDash) fitFlowChart($('#view'), lastDash, true); }, 150);
 });

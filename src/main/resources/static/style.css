@@ -756,38 +756,49 @@ body[data-view="dashboard"] .top { display: none; }
         font-size: 26px;
       }
 
-    /* the quick links: one row of pills to swipe along, running to the screen's edges */
+    /* the quick links: four shortcuts across the screen, the icon over its name, split by the same thin lines as on a computer.
+       No boxes or pills; the whole column is the thing to tap. */
     .dash-actions
       {
-        flex: none; flex-wrap: nowrap; gap: 8px; width: calc(100% + 32px); max-width: none;
-        margin: 0 -16px; padding: 2px 16px; overflow-x: auto; scrollbar-width: none; scroll-padding: 0 16px;
-      }
-
-    .dash-actions::-webkit-scrollbar
-      {
-        display: none;
+        flex: 1 0 100%; display: grid; grid-template-columns: 1fr auto 1fr auto 1fr auto 1fr; align-items: start;
+        gap: 0; margin-top: 2px;
       }
 
     .dash-actions .vr
       {
-        display: none;
+        height: 30px;
+        align-self: center;
       }
 
     .dash-link
       {
-        flex: none; min-height: 40px; padding: 8px 14px; border-radius: 99px; white-space: nowrap; font-size: 14px;
-        background: var(--white); box-shadow: inset 0 0 0 1px var(--dash-hair); -webkit-tap-highlight-color: transparent;
+        position: relative; flex-direction: column; justify-content: flex-start; gap: 7px; min-height: 64px; padding: 6px 4px;
+        font-size: 12.5px; line-height: 1.25; text-align: center; text-wrap: balance; -webkit-tap-highlight-color: transparent;
       }
 
     .dash-link svg
       {
-        width: 18px;
-        height: 18px;
+        width: 24px;
+        height: 24px;
+        color: var(--side);
+        transition: transform 120ms var(--ease-out);
       }
 
     .dash-link:active
       {
-        background: var(--dash-blue-soft);
+        color: var(--ink);
+      }
+
+    .dash-link:active svg
+      {
+        transform: scale(.9);
+      }
+
+    /* the waiting count sits on the icon's top corner, cut out from the page */
+    .dash-link .dash-count
+      {
+        position: absolute; top: 0; left: calc(50% + 4px);
+        min-width: 20px; height: 20px; padding: 0 5px; font-size: 11px; box-shadow: 0 0 0 2px var(--bg);
       }
 
     /* savings across the top, members and shares side by side under it */
@@ -904,6 +915,25 @@ body[data-view="dashboard"] .top { display: none; }
       {
         gap: 6px 14px;
         font-size: 12.5px;
+      }
+
+    /* a finger dragged sideways across the chart picks the month; up and down still scrolls the page */
+    .chart-wrap
+      {
+        touch-action: pan-y;
+        user-select: none;
+        -webkit-user-select: none;
+        -webkit-tap-highlight-color: transparent;
+      }
+
+    .chart-tip
+      {
+        display: none;
+      }
+
+    .chart .bar
+      {
+        transition: fill 120ms ease;
       }
 
     /* the latest movements: each line becomes two, the member on top and what it was under it, the amount on the right */
@@ -1085,8 +1115,42 @@ hr.sep { border: 0; border-top: 1px solid var(--line); margin: 6px 0 2px; }
     .mbar
       {
         display: flex; align-items: center; gap: 10px; position: sticky; top: 0; z-index: 4;
-        min-height: 56px; padding: env(safe-area-inset-top) 16px 0 6px;
-        background: var(--side); color: var(--side-ink); font-size: 17px; font-weight: 600; letter-spacing: -.02em;
+        min-height: 56px; padding: env(safe-area-inset-top) 6px 0 6px;
+        background: rgba(11, 29, 77, .96); color: var(--side-ink); font-size: 17px; font-weight: 600; letter-spacing: -.02em;
+        -webkit-backdrop-filter: blur(18px) saturate(160%); backdrop-filter: blur(18px) saturate(160%);
+        transition: box-shadow 200ms var(--ease-out);
+      }
+
+    /* once the page has moved under the bar it lifts off it with a soft shadow, instead of a hard line */
+    .scrolled .mbar
+      {
+        box-shadow: 0 10px 24px -14px rgba(11, 29, 77, .55);
+      }
+
+    /* the person's initials on the right: opens the menu with the account options showing */
+    .mbar-me
+      {
+        width: 44px; height: 44px; margin-left: auto; display: grid; place-items: center; flex: none;
+        border: 0; border-radius: 50%; background: none; padding: 0; cursor: pointer; -webkit-tap-highlight-color: transparent;
+        transition: transform 120ms var(--ease-out);
+      }
+
+    #mbarInitials
+      {
+        width: 34px; height: 34px; border-radius: 50%; display: grid; place-items: center;
+        background: rgba(255, 255, 255, .14); box-shadow: inset 0 0 0 1px rgba(255, 255, 255, .18);
+        color: var(--side-ink); font-size: 12.5px; font-weight: 600; letter-spacing: .02em;
+      }
+
+    .mbar-me:active
+      {
+        transform: scale(.94);
+      }
+
+    .mbar-me:focus-visible
+      {
+        outline: 2px solid var(--side-focus);
+        outline-offset: -2px;
       }
 
     .mbar-btn
@@ -1144,6 +1208,16 @@ hr.sep { border: 0; border-top: 1px solid var(--line); margin: 6px 0 2px; }
         transition: transform 220ms var(--ease-out), visibility 0s linear 220ms, box-shadow 220ms var(--ease-out);
       }
 
+    .side
+      {
+        touch-action: pan-y;
+      }
+
+    .side-dragging .side, .side-dragging .scrim
+      {
+        transition: none;
+      }
+
     .nav-open .side
       {
         transform: none;
@@ -1195,9 +1269,19 @@ hr.sep { border: 0; border-top: 1px solid var(--line); margin: 6px 0 2px; }
     .row2, .line { grid-template-columns: 1fr; }
   }
 
+@media (max-width: 860px) and (prefers-reduced-transparency: reduce)
+  {
+    .mbar
+      {
+        background: var(--side);
+        -webkit-backdrop-filter: none;
+        backdrop-filter: none;
+      }
+  }
+
 @media (max-width: 860px) and (prefers-reduced-motion: reduce)
   {
-    .side, .nav-open .side, .mbar-btn
+    .side, .nav-open .side, .mbar-btn, .mbar-me
       {
         transition: none;
       }
