@@ -28,7 +28,8 @@ public class SecurityConfig {
             }))
             .authorizeHttpRequests(a -> a
                 // The web app itself (HTML/CSS/JS); data still requires login
-                .requestMatchers(HttpMethod.GET, "/", "/index.html", "/app.js", "/style.css", "/favicon.ico").permitAll()
+                .requestMatchers(HttpMethod.GET, "/", "/index.html", "/app.js", "/style.css", "/favicon.ico",
+                        "/fonts/google-sans-variable.woff2", "/fonts/google-sans-italic-variable.woff2").permitAll()
                 .requestMatchers(HttpMethod.GET, "/api/public/**").permitAll()
                 // A member's own login: their statement only
                 .requestMatchers("/api/my/**").hasRole("MEMBER")

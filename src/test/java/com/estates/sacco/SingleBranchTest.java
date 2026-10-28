@@ -52,6 +52,17 @@ class SingleBranchTest {
     }
 
     @Test
+    void bundledFontsLoadBeforeSignIn() throws Exception {
+        for (String font : new String[] {"google-sans-variable.woff2", "google-sans-italic-variable.woff2"}) {
+            byte[] bytes = mvc.perform(get("/fonts/" + font)).andExpect(status().isOk())
+                    .andReturn().getResponse().getContentAsByteArray();
+            assertEquals("wOF2", new String(bytes, 0, 4, java.nio.charset.StandardCharsets.US_ASCII));
+        }
+        // Publishing the font files does not publish the app's data.
+        send(nobody, "GET", "/api/me", null, 401);
+    }
+
+    @Test
     void oneBranchInstallation() throws Exception {
         // the login page learns this is a one-branch installation and sees that one branch only
         JsonNode cfg = send(nobody, "GET", "/api/public/config", null, 200);
