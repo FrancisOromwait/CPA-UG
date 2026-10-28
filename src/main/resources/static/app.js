@@ -206,20 +206,100 @@ $('#loginForm').addEventListener('submit', async e => {
 
 $('#logout').addEventListener('click', signOut);
 
-/* the button beside the logo folds the menu down to its icons (names show on hover); this browser remembers the choice */
-function foldSide(folded) {
-  $('#app').classList.toggle('side-collapsed', folded);
-  const t = $('#sideToggle');
-  const tip = folded ? 'Show the full menu' : 'Fold the menu to icons';
-  t.setAttribute('aria-pressed', String(folded));
-  t.setAttribute('aria-label', tip);
-  t.title = tip;
-  document.querySelectorAll('#nav a, #nav .nav-drop-btn').forEach(el => {
-    if (folded) el.title = el.textContent.trim(); else el.removeAttribute('title');
-  });
-  try { localStorage.setItem('cpa.sideFolded', folded ? '1' : ''); } catch (e) { /* no storage: not remembered */ }
-}
+/* the button beside the logo folds the menu down to its icons (names show on hover); this browser remembers the choice.
+   quiet is for the first drawing after sign-in, when nothing should move. */
+let sideMoveTimer = 0;
+function foldSide(folded, quiet)
+    {
+        const app = $('#app');
+        hideTip();
+        // the fold button and the name beside the logo hide while they change place, then fade back in once the menu has mostly moved
+        if(!quiet)
+            {
+                clearTimeout(sideMoveTimer);
+                app.classList.add('side-moving');
+                sideMoveTimer = setTimeout(() => app.classList.remove('side-moving'), 120);
+            }
+        app.classList.toggle('side-collapsed', folded);
+        const t = $('#sideToggle');
+        const tip = folded ? 'Show the full menu' : 'Fold the menu to icons';
+        t.setAttribute('aria-pressed', String(folded));
+        t.setAttribute('aria-label', tip);
+        t.dataset.tip = tip;
+        // the folded menu shows names with its own little label (showTip), so the browser's slow one is taken off
+        document.querySelectorAll('#nav a, #nav .nav-drop-btn').forEach(el => el.dataset.tip = el.textContent.trim());
+        [t, $('#meBtn')].forEach(b =>
+            {
+                if(folded || !b.dataset.tip) b.removeAttribute('title');
+                else b.title = b.dataset.tip;
+            });
+        // a drop-down hidden by the fold can't be reached with the Tab key either
+        document.querySelectorAll('#nav .nav-drop').forEach(d => openDrop(d, $('.nav-drop-btn', d).getAttribute('aria-expanded') === 'true'));
+        try { localStorage.setItem('cpa.sideFolded', folded ? '1' : ''); } catch (e) { /* no storage: not remembered */ }
+    }
 $('#sideToggle').addEventListener('click', () => foldSide(!$('#app').classList.contains('side-collapsed')));
+
+/* The names on the folded menu: a small black label beside the icon. The first one waits a moment,
+   so it doesn't flash up as the mouse passes by; once one is showing, moving to the next icon swaps it over at once. */
+const sideTip = document.createElement('div');
+sideTip.className = 'side-tip';
+sideTip.setAttribute('aria-hidden', 'true');   // the names are already read out from the menu itself
+document.body.append(sideTip);
+const canHover = matchMedia('(hover: hover) and (pointer: fine)');
+let tipFor = null, tipWait = 0, tipWarmUntil = 0;
+
+function showTip(el)
+    {
+        clearTimeout(tipWait);
+        tipFor = el;
+        const place = () =>
+            {
+                const r = el.getBoundingClientRect();
+                sideTip.textContent = el.dataset.tip;
+                sideTip.style.left = `${r.right + 10}px`;
+                sideTip.style.top = `${r.top + r.height / 2}px`;
+                sideTip.classList.add('show');
+            };
+        if(sideTip.classList.contains('show') || Date.now() < tipWarmUntil)
+            {
+                sideTip.classList.add('instant');
+                place();
+            }
+        else
+            {
+                sideTip.classList.remove('instant');
+                tipWait = setTimeout(place, 400);
+            }
+    }
+
+function hideTip()
+    {
+        clearTimeout(tipWait);
+        if(sideTip.classList.contains('show')) tipWarmUntil = Date.now() + 300;
+        sideTip.classList.remove('show', 'instant');
+        tipFor = null;
+    }
+
+const side = $('.side');
+const tipTarget = node => $('#app').classList.contains('side-collapsed') && node instanceof Element ? node.closest('[data-tip]') : null;
+side.addEventListener('mouseover', e =>
+    {
+        const el = tipTarget(e.target);
+        if(el && el !== tipFor && canHover.matches) showTip(el);
+    });
+side.addEventListener('mouseout', e =>
+    {
+        if(tipFor && !tipFor.contains(e.relatedTarget)) hideTip();
+    });
+// the Tab key shows the name too, but a mouse click doesn't
+side.addEventListener('focusin', e =>
+    {
+        const el = tipTarget(e.target);
+        if(el && el.matches(':focus-visible')) showTip(el);
+    });
+side.addEventListener('focusout', () => hideTip());
+side.addEventListener('pointerdown', () => hideTip());
+$('#nav').addEventListener('scroll', () => hideTip());
 
 /* the signed-in person at the foot of the menu opens a small menu (change password, sign out); any other click or Escape closes it */
 function showMeMenu(open) {
@@ -385,10 +465,12 @@ const svgOf = (d, cls) => `<svg class="${cls}" viewBox="0 0 24 24" fill="none" a
 const navIcon = k => SIDE_ICONS[k] ? `<span class="nav-ic">${svgOf(SIDE_ICONS[k][0], 'ic-l')}${svgOf(SIDE_ICONS[k][1], 'ic-b')}</span>` : '';
 
 /** Opens or closes a drop-down in the menu. */
-function openDrop(drop, open) {
-  $('.nav-drop-list', drop).hidden = !open;
-  $('.nav-drop-btn', drop).setAttribute('aria-expanded', String(open));
-}
+function openDrop(drop, open)
+    {
+        // the list grows and shrinks in style.css; while it's shut (or the menu is folded) its screens are out of the Tab order
+        $('.nav-drop-btn', drop).setAttribute('aria-expanded', String(open));
+        $('.nav-drop-list', drop).inert = !open || $('#app').classList.contains('side-collapsed');
+    }
 
 function navHtml(items) {
   return items.map(([k, t, kids]) => kids
@@ -396,9 +478,9 @@ function navHtml(items) {
       `<div class="nav-sub">${kids.map(([ck, ct, sub]) => sub
         // an entry with screens of its own is a drop-down: a click on it opens or closes the list
         ? `<div class="nav-drop"><button type="button" class="nav-drop-btn" aria-expanded="false">${navIcon(ck)}<span class="nav-label">${esc(ct)}</span>` +
-          `<span class="chev" aria-hidden="true">${svgOf(ISX.ArrowDown2[0], '')}</span></button><div class="nav-drop-list" hidden>` +
+          `<span class="chev" aria-hidden="true">${svgOf(ISX.ArrowDown2[0], '')}</span></button><div class="nav-drop-list" inert><div class="nav-drop-in">` +
           // the screens inside a drop-down hang from a line, so they carry no icon of their own
-          sub.map(([sk, st]) => `<a href="#${sk}" data-k="${sk}"><span>${esc(st)}</span></a>`).join('') + `</div></div>`
+          sub.map(([sk, st]) => `<a href="#${sk}" data-k="${sk}"><span>${esc(st)}</span></a>`).join('') + `</div></div></div>`
         : `<a href="#${ck}" data-k="${ck}">${navIcon(ck)}<span class="nav-label">${esc(ct)}</span></a>`).join('')}</div></div>`
     : `<a href="#${k}" data-k="${k}">${navIcon(k)}<span class="nav-label">${esc(t)}</span></a>`).join('');
 }
@@ -412,11 +494,11 @@ function start() {
     if ($('#app').classList.contains('side-collapsed')) { foldSide(false); openDrop(b.parentElement, true); }
     else openDrop(b.parentElement, b.getAttribute('aria-expanded') !== 'true');
   });
+  $('#who').innerHTML = `${esc(S.me.fullName)}<small>${esc(label(S.me.role))}</small>`;
+  $('#meBtn').dataset.tip = `${S.me.fullName} · ${label(S.me.role)}`;
   let folded = false;
   try { folded = localStorage.getItem('cpa.sideFolded') === '1'; } catch (e) { /* no storage: start unfolded */ }
-  foldSide(folded);
-  $('#who').innerHTML = `${esc(S.me.fullName)}<small>${esc(label(S.me.role))}</small>`;
-  $('#meBtn').title = `${S.me.fullName} · ${label(S.me.role)}`;
+  foldSide(folded, true);
   const names = String(S.me.fullName || S.me.username || '?').trim().split(/\s+/);
   $('#whoInitials').textContent = (names.length > 1 ? names[0][0] + names[names.length - 1][0] : names[0].slice(0, 2)).toUpperCase();
   const brand = isMgr() ? S.appName : S.me.branchName;
