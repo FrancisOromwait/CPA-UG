@@ -235,9 +235,42 @@ function foldSide(folded, quiet)
             });
         // a drop-down hidden by the fold can't be reached with the Tab key either
         document.querySelectorAll('#nav .nav-drop').forEach(d => openDrop(d, $('.nav-drop-btn', d).getAttribute('aria-expanded') === 'true'));
-        try { localStorage.setItem('cpa.sideFolded', folded ? '1' : ''); } catch (e) { /* no storage: not remembered */ }
+        // only a click is remembered, so a phone opening the full menu doesn't undo the choice made on a computer
+        if(!quiet) try { localStorage.setItem('cpa.sideFolded', folded ? '1' : ''); } catch (e) { /* no storage: not remembered */ }
     }
 $('#sideToggle').addEventListener('click', () => foldSide(!$('#app').classList.contains('side-collapsed')));
+
+/* Phones: the menu is a drawer that slides in from the left over the page (the ☰ button in the top bar).
+   It's always the full menu there, never folded, and it closes when a screen is picked. */
+const phone = matchMedia('(max-width: 860px)');
+function openSide(open)
+    {
+        const app = $('#app');
+        app.classList.toggle('nav-open', open);
+        document.body.classList.toggle('nav-open', open);
+        $('#menuBtn').setAttribute('aria-expanded', String(open));
+        // a shut drawer can't be reached with the Tab key either
+        $('#side').inert = phone.matches && !open;
+        if(open) $('#sideClose').focus();
+        else if(phone.matches && $('#side').contains(document.activeElement)) $('#menuBtn').focus();
+    }
+function phoneMenu()
+    {
+        if(phone.matches) foldSide(false, true);
+        else
+            {
+                let folded = false;
+                try { folded = localStorage.getItem('cpa.sideFolded') === '1'; } catch (e) { /* no storage: unfolded */ }
+                foldSide(folded, true);
+            }
+        openSide(false);
+    }
+phone.addEventListener('change', () => { if(S.me) phoneMenu(); });
+$('#menuBtn').addEventListener('click', () => openSide(true));
+$('#sideClose').addEventListener('click', () => openSide(false));
+$('#scrim').addEventListener('click', () => openSide(false));
+$('#nav').addEventListener('click', e => { if(phone.matches && e.target.closest('a')) openSide(false); });
+document.addEventListener('keydown', e => { if(e.key === 'Escape' && $('#app').classList.contains('nav-open')) openSide(false); });
 
 /* The names on the folded menu: a small black label beside the icon. The first one waits a moment,
    so it doesn't flash up as the mouse passes by; once one is showing, moving to the next icon swaps it over at once. */
@@ -511,9 +544,7 @@ function start() {
   });
   $('#who').innerHTML = `${esc(S.me.fullName)}<small>${esc(label(S.me.role))}</small>`;
   $('#meBtn').dataset.tip = `${S.me.fullName} · ${label(S.me.role)}`;
-  let folded = false;
-  try { folded = localStorage.getItem('cpa.sideFolded') === '1'; } catch (e) { /* no storage: start unfolded */ }
-  foldSide(folded, true);
+  phoneMenu();   // folded as last time on a computer; the full menu, shut away, on a phone
   const names = String(S.me.fullName || S.me.username || '?').trim().split(/\s+/);
   $('#whoInitials').textContent = (names.length > 1 ? names[0][0] + names[names.length - 1][0] : names[0].slice(0, 2)).toUpperCase();
   const brand = isMgr() ? S.appName : S.me.branchName;
@@ -522,6 +553,9 @@ function start() {
   $('#brandMark').innerHTML = S.single
     ? `<span class="brand-logo" role="img" aria-label="${esc(brand)} logo"></span>`
     : markHtml(brand, isMgr() ? HQ : S.me.branchCode, true);
+  // the phone's top bar carries the same logo and name
+  $('#mbarMark').innerHTML = $('#brandMark').innerHTML.replace(/ aria-label="[^"]*"/, ' aria-hidden="true"');
+  $('#mbarName').textContent = brand;
   document.title = isMgr() ? `${S.appName} · Support` : brand;
   const scopeText = isMgr() ? 'All branches' : S.single ? '' : `Sacco ID ${S.me.branchCode}`;
   $('#scope').textContent = scopeText;
@@ -622,7 +656,7 @@ function moveRows(moves) {
       `<th class="num"${lines[r.date] > 1 ? ` title="Net for the day">${signed(net[r.date])}` : '>'}</th></tr>`;
     shown = r.date;
     return head + `<tr><td><span class="who"><span class="who-av" aria-hidden="true">${esc(initials(r.memberName))}</span>` +
-      `<strong>${esc(r.memberName)}</strong><span class="mno">${esc(r.memberNo)}</span></span></td><td class="what">${esc(r.type)}</td>` +
+      `<strong>${esc(r.memberName)}</strong><span class="mno">${esc(r.memberNo)}</span></span></td><td class="what">${esc(r.type)}<span class="mno-m"> · ${esc(r.memberNo)}</span></td>` +
       `<td class="num amt ${r.moneyIn ? 'in' : 'out'}">${signed((r.moneyIn ? 1 : -1) * Number(r.amount))}</td></tr>`;
   }).join('');
 }
@@ -630,8 +664,8 @@ function moveRows(moves) {
 /** Money in (CPA blue) and money out (navy) for each month. Bars are hatched and pale; the month in focus
     (this month, or the one under the pointer) turns solid and shows its money in above the bars.
     A dashed yellow line marks the average money in. The figures are also given as a table below it. */
-function flowChart(months, H = 290) {
-  const W = 760, L = 46, R = 6, T = 34, B = 34;
+function flowChart(months, H = 290, W = 760) {
+  const L = 46, R = 6, T = 34, B = 34;
   const max = Math.max(1, ...months.flatMap(m => [Number(m.moneyIn), Number(m.moneyOut)]));
   // a round top for the axis: 1, 2 or 5 times a power of ten, four steps of at least one shilling
   const raw = max / 4, p = Math.pow(10, Math.floor(Math.log10(raw))), step = Math.max(1, [1, 2, 5, 10].map(x => x * p).find(x => x >= raw));
@@ -671,7 +705,7 @@ function flowChart(months, H = 290) {
       `<text class="ax mlab" x="${cx}" y="${H - 10}" text-anchor="middle">${esc(mon)}${i === 0 || mon === 'Jan' ? ' ' + esc(yr.slice(2)) : ''}</text>` +
       `<rect class="hit" x="${L + slot * i}" y="0" width="${slot}" height="${H}"/></g>`;
   });
-  return `<div class="chart-wrap"><svg class="chart" viewBox="0 0 ${W} ${H}" role="img" aria-label="Money in and out for the last twelve months">${svg}${avgTag}</svg>` +
+  return `<div class="chart-wrap"><svg class="chart" viewBox="0 0 ${W} ${H}" role="img" aria-label="Money in and out for the last ${months.length} months">${svg}${avgTag}</svg>` +
     `<div class="chart-tip" hidden></div></div>`;
 }
 
@@ -756,9 +790,16 @@ let lastDash = null;
 function fitFlowChart(el, d, still = false) {
   const grid = $('.money-grid', el);
   if (!grid || !$('.chart-wrap', el)) return;
-  $('.chart-wrap', el).outerHTML = flowChart(d.months);
-  const room = window.innerHeight - 22 - (grid.getBoundingClientRect().bottom + window.scrollY);
-  if (room > 0) $('.chart-wrap', el).outerHTML = flowChart(d.months, Math.min(560, 290 + room * 760 / $('.chart-wrap', el).clientWidth));
+  // a phone draws the last six months at the card's own width, so the writing stays its real size instead of shrinking
+  const months = phone.matches ? d.months.slice(-6) : d.months;
+  $('.chart-card .card-sub', el).textContent = `Last ${months.length} months`;
+  if(phone.matches) $('.chart-wrap', el).outerHTML = flowChart(months, 240, Math.max(280, $('.chart-wrap', el).clientWidth));
+  else
+      {
+          $('.chart-wrap', el).outerHTML = flowChart(months);
+          const room = window.innerHeight - 22 - (grid.getBoundingClientRect().bottom + window.scrollY);
+          if(room > 0) $('.chart-wrap', el).outerHTML = flowChart(months, Math.min(560, 290 + room * 760 / $('.chart-wrap', el).clientWidth));
+      }
   const wrap = $('.chart-wrap', el), tip = $('.chart-tip', el), groups = [...wrap.querySelectorAll('.mo')];
   wrap.classList.toggle('still', still);   // a resize redraws the chart without the bars growing in again
 
@@ -771,13 +812,15 @@ function fitFlowChart(el, d, still = false) {
   };
   focus(groups.length - 1);
   groups.forEach((g, i) => {
-    g.addEventListener('mouseenter', e => {
-      const m = d.months[i];
+    const show = e => {
+      const m = months[i];
       tip.innerHTML = `<strong>${esc(m.label)}</strong><span><i class="sw in"></i>In ${money(m.moneyIn)}</span><span><i class="sw out"></i>Out ${money(m.moneyOut)}</span>`;
       tip.hidden = false;
       focus(i);
       place(e);
-    });
+    };
+    g.addEventListener('mouseenter', show);
+    g.addEventListener('click', show);   // a tap on a phone shows the month's figures too
     g.addEventListener('mousemove', place);
   });
   wrap.addEventListener('mouseleave', () => { tip.hidden = true; focus(groups.length - 1); });
