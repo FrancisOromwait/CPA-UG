@@ -577,19 +577,19 @@ const amountHtml = n => {
   return `<span class="amt-cur">UGX</span>${esc(num)}${unit ? `<span class="amt-unit">${esc(unit)}</span>` : ''}`;
 };
 
-/** One of the three tinted cards at the top: a white disc with a filled icon, the label, the figure and a small line under it. */
-const heroCard = (icon, label, valueHtml, full, sub, href) =>
+/** One of the three tinted cards at the top: a white disc with a filled icon, the label and the figure. */
+const heroCard = (icon, label, valueHtml, full, href) =>
   `<a class="hero" href="${href}"${full ? ` title="${esc(full)}"` : ''}>` +
   `<span class="hero-ic">${svgOf(ISX[icon][1], '')}</span>` +
-  `<span class="hero-txt"><span class="hero-l">${esc(label)}</span><span class="hero-v">${valueHtml}</span><span class="hero-s">${sub}</span></span>` +
+  `<span class="hero-txt"><span class="hero-l">${esc(label)}</span><span class="hero-v">${valueHtml}</span></span>` +
   `<span class="hero-go">${svgOf(ISX.ArrowRight2[0], '')}</span></a>`;
 
-/** One figure in the white cards under the tinted ones: label, figure, small line, and sometimes a ring on the right.
+/** One figure in the white cards under the tinted ones: label, figure, and sometimes a ring on the right.
     No icon; the label says it all. A small arrow after the label shows on hover. */
-const stripCell = (label, valueHtml, full, sub, href, ringHtml = '') =>
+const stripCell = (label, valueHtml, full, href, ringHtml = '') =>
   `<a class="strip-cell" href="${href}"${full ? ` title="${esc(full)}"` : ''}>` +
   `<span class="strip-txt"><span class="strip-l">${esc(label)}${svgOf(ISX.ArrowRight2[0], 'strip-go')}</span>` +
-  `<span class="strip-v">${valueHtml}</span><span class="strip-s">${sub}</span></span>${ringHtml}</a>`;
+  `<span class="strip-v">${valueHtml}</span></span>${ringHtml}</a>`;
 
 /** A round progress ring with its percentage beside it and a short caption under that (as in the reference's tracker).
     The ring stops at full; the number shows the true figure, even above 100%. */
@@ -600,17 +600,38 @@ const ring = (pct, caption, cls) => {
     `<span class="ring-txt"><b>${p}%</b><small>${esc(caption)}</small></span></span>`;
 };
 
-/** Two letters for a round name badge. */
-const initials = name => {
-  const parts = String(name || '?').trim().split(/\s+/);
-  return (parts.length > 1 ? parts[0][0] + parts[parts.length - 1][0] : parts[0].slice(0, 2)).toUpperCase();
-};
+/** The dashboard's latest movements as table rows, with a band for each day (and its net total when it has several lines).
+    The amount's sign and colour say which way the money went: + in (CPA blue), − out (navy), as in the chart. */
+function moveRows(moves) {
+  const iso = dt => `${dt.getFullYear()}-${String(dt.getMonth() + 1).padStart(2, '0')}-${String(dt.getDate()).padStart(2, '0')}`;
+  const now = new Date(), todayIso = iso(now), yesterdayIso = iso(new Date(now.getFullYear(), now.getMonth(), now.getDate() - 1));
+  const dayName = day => day === todayIso ? 'Today' : day === yesterdayIso ? 'Yesterday'
+    : new Date(day + 'T00:00').toLocaleDateString('en-GB', { weekday: 'long', day: 'numeric', month: 'long' });
+  const signed = n => (n < 0 ? '−' : '+') + money(Math.abs(n));
+  const net = {}, lines = {};
+  moves.forEach(r => { net[r.date] = (net[r.date] || 0) + (r.moneyIn ? 1 : -1) * Number(r.amount); lines[r.date] = (lines[r.date] || 0) + 1; });
+  // two letters for the member's disc
+  const initials = name => {
+    const parts = String(name || '?').trim().split(/\s+/);
+    return (parts.length > 1 ? parts[0][0] + parts[parts.length - 1][0] : parts[0].slice(0, 2)).toUpperCase();
+  };
+  let shown = '';
+  return moves.map(r => {
+    const head = r.date === shown ? '' : `<tr class="day"><th colspan="2" scope="colgroup">${esc(dayName(r.date))}</th>` +
+      // a day's net total, shown only when it adds up more than one line
+      `<th class="num"${lines[r.date] > 1 ? ` title="Net for the day">${signed(net[r.date])}` : '>'}</th></tr>`;
+    shown = r.date;
+    return head + `<tr><td><span class="who"><span class="who-av" aria-hidden="true">${esc(initials(r.memberName))}</span>` +
+      `<strong>${esc(r.memberName)}</strong><span class="mno">${esc(r.memberNo)}</span></span></td><td class="what">${esc(r.type)}</td>` +
+      `<td class="num amt ${r.moneyIn ? 'in' : 'out'}">${signed((r.moneyIn ? 1 : -1) * Number(r.amount))}</td></tr>`;
+  }).join('');
+}
 
 /** Money in (CPA blue) and money out (navy) for each month. Bars are hatched and pale; the month in focus
     (this month, or the one under the pointer) turns solid and shows its money in above the bars.
     A dashed yellow line marks the average money in. The figures are also given as a table below it. */
-function flowChart(months) {
-  const W = 760, H = 290, L = 46, R = 6, T = 34, B = 34;
+function flowChart(months, H = 290) {
+  const W = 760, L = 46, R = 6, T = 34, B = 34;
   const max = Math.max(1, ...months.flatMap(m => [Number(m.moneyIn), Number(m.moneyOut)]));
   // a round top for the axis: 1, 2 or 5 times a power of ten, four steps of at least one shilling
   const raw = max / 4, p = Math.pow(10, Math.floor(Math.log10(raw))), step = Math.max(1, [1, 2, 5, 10].map(x => x * p).find(x => x >= raw));
@@ -654,9 +675,6 @@ function flowChart(months) {
     `<div class="chart-tip" hidden></div></div>`;
 }
 
-/** The icon for a cash, bank or mobile money account, from its name. */
-const accountIcon = name => /mobile|momo|mtn|airtel/i.test(name) ? 'Mobile' : /bank|stanbic|centenary|dfcu|absa|equity|housing/i.test(name) ? 'Bank' : 'EmptyWallet';
-
 views.dashboard = async el => {
   const d = await api('/api/reports/dashboard');
   const hour = new Date().getHours();
@@ -665,7 +683,6 @@ views.dashboard = async el => {
   const full = n => 'UGX ' + money(n);
   const count = n => Number(n).toLocaleString('en-US');
   const thisMonth = d.months[d.months.length - 1];
-  const inactive = d.members - d.activeMembers;
   const savings = Number(d.savings);   // the rings under the tinted cards compare loans and cash with members' savings
   // an account's part of all the cash and bank money, as a whole percentage (an overdrawn account counts as none)
   const share = b => Number(d.cashTotal) > 0 ? Math.max(0, Math.round(Number(b) / Number(d.cashTotal) * 100)) : 0;
@@ -680,66 +697,72 @@ views.dashboard = async el => {
       `<a class="dash-link" href="#members">${svgOf(ISX.Profile2User[0], '')}Member list</a>` +
       `<span class="vr" aria-hidden="true"></span>` +
       `<a class="dash-link" href="#reports/cashbook-receipts">${svgOf(ISX.MoneyRecive[0], '')}Cashbook</a>` +
-      `<a class="dash-cta" href="#deposits">${svgOf(ISX.Add[0], '')}Regular deposit</a></nav>`) +
+      `<span class="vr" aria-hidden="true"></span>` +
+      `<a class="dash-link" href="#deposits">${svgOf(ISX.Add[0], '')}Regular deposit</a></nav>`) +
     `</header>` +
 
     `<div class="heroes">` +
-    heroCard('Profile2User', 'Members', count(d.members), '', `${count(d.activeMembers)} active`, '#members') +
-    heroCard('EmptyWallet', 'Savings', amountHtml(d.savings), full(d.savings), `${count(d.savers)} savers · interest owed ${compact(d.savingsInterest)}`, '#reports/savings-report') +
-    heroCard('Graph', 'Shares', amountHtml(d.shares), full(d.shares), 'paid-up share capital', '#reports/shares-report') +
+    heroCard('Profile2User', 'Active members', count(d.activeMembers), '', '#members') +
+    heroCard('EmptyWallet', 'Savings', amountHtml(d.savings), full(d.savings), '#reports/savings-report') +
+    heroCard('Graph', 'Shares', amountHtml(d.shares), full(d.shares), '#reports/shares-report') +
     `</div>` +
     // the two loan figures share a card; cash & bank has its own, under the third tinted card
-    `<div class="strip">` +
+    // the loan figures and the chart on the left; cash & bank on the right, as one card from the figure down to its accounts
+    `<div class="money-grid">` +
     `<div class="strip-group loans">` +
-    stripCell('Loans outstanding', amountHtml(d.loans), full(d.loans), `${count(d.borrowers)} borrowers`, '#reports/loan-report',
+    stripCell('Loans outstanding', amountHtml(d.loans), full(d.loans), '#reports/loan-report',
       savings > 0 ? ring(Number(d.loans) / savings * 100, 'of savings lent out', 'lent') : '') +
-    stripCell('Loan interest owed', amountHtml(d.loanInterest), full(d.loanInterest), 'charged, not yet paid', '#reports/loan-report') +
-    `</div><div class="strip-group">` +
-    stripCell('Cash & bank', amountHtml(d.cashTotal), full(d.cashTotal), `${d.cash.length} account${d.cash.length === 1 ? '' : 's'}`, '#reports/cashbook-receipts',
-      savings > 0 ? ring(Number(d.cashTotal) / savings * 100, 'of savings on hand', 'held') : '') +
-    `</div></div>` +
-
-    `<div class="dash-grid">` +
+    stripCell('Loan interest owed', amountHtml(d.loanInterest), full(d.loanInterest), '#reports/loan-report') +
+    `</div>` +
     `<section class="card chart-card">` +
-    `<div class="card-head"><h3>Money in and out</h3><span class="vr" aria-hidden="true"></span><span class="card-sub">Last 12 months</span>` +
+    `<div class="card-head"><h3>Money In &amp; Out</h3><span class="vr" aria-hidden="true"></span><span class="card-sub">Last 12 months</span>` +
     `<div class="flow-now" title="${esc(full(thisMonth.moneyIn))}"><span class="flow-v">${amountHtml(thisMonth.moneyIn)}</span><span class="flow-l">in this month</span></div></div>` +
-    `<div class="legend"><span><i class="sw in"></i>Money in from members</span><span><i class="sw out"></i>Money out to members</span></div>` +
+    `<div class="legend"><span title="Savings, shares, membership and loan repayments"><i class="sw in"></i>Money in from members</span>` +
+    `<span title="Withdrawals, refunds and loans paid out"><i class="sw out"></i>Money out to members</span></div>` +
     flowChart(d.months) +
-    `<p class="small-note">This month so far: in <strong>UGX ${money(thisMonth.moneyIn)}</strong>, out <strong>UGX ${money(thisMonth.moneyOut)}</strong>. ` +
-    `In: savings, shares, membership and loan repayments. Out: withdrawals, refunds and loans paid out.</p>` +
-    `<details class="figs"><summary>Show the figures</summary>` + table([
+    // the same figures as a table, kept off screen for screen readers (the chart's hover note shows them to everyone else)
+    `<div class="sr-only">` + table([
       { h: 'Month', f: r => esc(r.label) }, { h: 'Money in', num: 1, f: r => money(r.moneyIn) }, { h: 'Money out', num: 1, f: r => money(r.moneyOut) },
-      { h: 'Difference', num: 1, f: r => money(Number(r.moneyIn) - Number(r.moneyOut)) }], d.months) + `</details></section>` +
+      { h: 'Difference', num: 1, f: r => money(Number(r.moneyIn) - Number(r.moneyOut)) }], d.months) + `</div></section>` +
 
-    `<section class="card cash-card"><div class="card-head"><h3>Cash and bank</h3></div>` +
-    (d.cash.length ? `<div class="accts">${d.cash.map(c => `<div class="acct"><span class="acct-ic">${svgOf(ISX[accountIcon(c.name)][0], '')}</span>` +
-      `<span class="acct-txt"><strong>${esc(c.name)}</strong><small>${esc(c.code)} · ${share(c.balance)}% of the total</small>` +
-      `<span class="acct-bar" aria-hidden="true"><i style="width:${share(c.balance)}%"></i></span></span><span class="num">${money(c.balance)}</span></div>`).join('')}` +
-      `<div class="acct total"><span>Total</span><span class="num">${money(d.cashTotal)}</span></div></div>`
+    `<section class="card cash-card">` +
+    stripCell('Cash & bank', amountHtml(d.cashTotal), full(d.cashTotal), '#reports/cashbook-receipts',
+      savings > 0 ? ring(Number(d.cashTotal) / savings * 100, 'of savings on hand', 'held') : '') +
+    // one line per account; the line under it fills to the account's part of the total
+    (d.cash.length ? `<div class="accts">${d.cash.map(c => `<div class="acct" style="--share:${share(c.balance)}%" title="${esc(c.code)} · ${share(c.balance)}% of the total">` +
+      `<span class="acct-n">${esc(c.name)}</span><span class="num">${money(c.balance)}</span></div>`).join('')}</div>`
       : `<div class="dash-empty">${svgOf(ISX.EmptyWallet[0], '')}<span>Nothing held yet.</span></div>`) +
     `</section></div>` +
 
-    `<div class="dash-grid lower">` +
-    `<section class="tracker"><div class="tracker-head"><h3>Latest money in and out</h3>${d.recent.length ? `<span class="dash-count soft">${d.recent.length}</span>` : ''}</div>` +
-    table([
-      { h: 'Date', f: r => `<span class="t-date">${esc(r.date)}</span>` },
-      { h: 'Member', f: r => `<span class="who"><span class="who-av t${(String(r.memberNo).length + String(r.memberName).length) % 3}">${esc(initials(r.memberName))}</span>` +
-        `<span><strong>${esc(r.memberName)}</strong><small>${esc(r.memberNo)}</small></span></span>` },
-      { h: 'What', f: r => `<span class="flow-tag ${r.moneyIn ? 'in' : 'out'}">${svgOf((r.moneyIn ? ISX.ArrowDown : ISX.ArrowUp)[0], '')}${r.moneyIn ? 'In' : 'Out'}</span> ${esc(r.type)}` },
-      { h: 'Amount', num: 1, f: r => `<strong>${money(r.amount)}</strong>` }], d.recent) + `</section>` +
-    `<section class="card"><div class="card-head"><h3>Needs attention</h3></div><div class="todo">` +
-    `<a class="todo-row${d.pendingLoans ? ' hot' : ''}" href="#loans"><span class="todo-n">${count(d.pendingLoans)}</span>` +
-    `<span class="todo-t">loan application${d.pendingLoans === 1 ? '' : 's'} waiting for a decision</span>${svgOf(ISX.ArrowRight2[0], 'todo-go')}</a>` +
-    `<a class="todo-row" href="#members"><span class="todo-n">${count(inactive)}</span>` +
-    `<span class="todo-t">inactive member${inactive === 1 ? '' : 's'}</span>${svgOf(ISX.ArrowRight2[0], 'todo-go')}</a>` +
-    `<a class="todo-row" href="#reports/savings-report"><span class="todo-n">${compact(d.savingsInterest)}</span>` +
-    `<span class="todo-t">savings interest owed to members (UGX)</span>${svgOf(ISX.ArrowRight2[0], 'todo-go')}</a>` +
-    `</div></section></div>` +
+    // latest money in and out: one line per movement under a heading for its day, the newest first
+    `<section class="card tracker"><div class="card-head"><h3>Latest money in and out</h3>` +
+    `<a class="card-link" href="#reports/cashbook-receipts">Cashbook${svgOf(ISX.ArrowRight2[0], '')}</a></div>` +
+    (d.recent.length ? `<table class="moves"><thead><tr><th>Member</th><th>What</th><th class="num">Amount (UGX)</th></tr></thead><tbody>${moveRows(d.recent)}</tbody></table>`
+      : `<div class="empty">No money in or out yet.</div>`) + `</section>` +
     (S.single ? '' : '<div id="branchSummary"></div>') +
     `</div>`;
 
-  // the chart: the month under the pointer comes into focus with a tooltip; leaving the chart returns focus to this month
+  lastDash = d;
+  fitFlowChart(el, d);
+
+  if (!S.single) await branchSummary($('#branchSummary'));
+};
+
+/** The dashboard's figures, kept so the chart can be resized with the window without asking the server again. */
+let lastDash = null;
+
+/** Makes the chart tall enough that the top of the dashboard fills the window and the lists below start just past its bottom edge,
+    then wires up the chart's hover. On a short window the chart keeps its usual height. */
+function fitFlowChart(el, d, still = false) {
+  const grid = $('.money-grid', el);
+  if (!grid || !$('.chart-wrap', el)) return;
+  $('.chart-wrap', el).outerHTML = flowChart(d.months);
+  const room = window.innerHeight - 22 - (grid.getBoundingClientRect().bottom + window.scrollY);
+  if (room > 0) $('.chart-wrap', el).outerHTML = flowChart(d.months, Math.min(560, 290 + room * 760 / $('.chart-wrap', el).clientWidth));
   const wrap = $('.chart-wrap', el), tip = $('.chart-tip', el), groups = [...wrap.querySelectorAll('.mo')];
+  wrap.classList.toggle('still', still);   // a resize redraws the chart without the bars growing in again
+
+  // the chart: the month under the pointer comes into focus with a tooltip; leaving the chart returns focus to this month
   const focus = i => groups.forEach((g, j) => g.classList.toggle('on', j === i));
   const place = e => {
     const box = wrap.getBoundingClientRect();
@@ -758,9 +781,13 @@ views.dashboard = async el => {
     g.addEventListener('mousemove', place);
   });
   wrap.addEventListener('mouseleave', () => { tip.hidden = true; focus(groups.length - 1); });
+}
 
-  if (!S.single) await branchSummary($('#branchSummary'));
-};
+let fitTimer;
+window.addEventListener('resize', () => {
+  clearTimeout(fitTimer);
+  fitTimer = setTimeout(() => { if (document.body.dataset.view === 'dashboard' && lastDash) fitFlowChart($('#view'), lastDash, true); }, 150);
+});
 
 /** Several branches: every branch on one line with totals (not needed with one branch). */
 async function branchSummary(el) {
