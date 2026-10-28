@@ -50,6 +50,22 @@ public interface LedgerRepository extends JpaRepository<LedgerEntry, Long> {
     @Query("select e.type, sum(e.amount) from LedgerEntry e where e.branch.id = :branchId group by e.type")
     List<Object[]> totalsByType(Long branchId);
 
+    /** The latest transactions of the given kinds up to a date, newest first (the dashboard's recent money in and out). */
+    @Query("""
+        select e from LedgerEntry e
+        where (:branchId is null or e.branch.id = :branchId) and e.type in :types and e.postedOn <= :to
+        order by e.postedOn desc, e.id desc
+        """)
+    List<LedgerEntry> latestOfTypes(Long branchId, java.util.Collection<TxType> types, LocalDate to, Pageable page);
+
+    /** Rows of [year, month, TxType, sum(amount)] between two dates, for one branch or (null) all: the dashboard's months. */
+    @Query("""
+        select extract(year from e.postedOn), extract(month from e.postedOn), e.type, sum(e.amount) from LedgerEntry e
+        where (:branchId is null or e.branch.id = :branchId) and e.postedOn >= :from and e.postedOn <= :to
+        group by extract(year from e.postedOn), extract(month from e.postedOn), e.type
+        """)
+    List<Object[]> monthlyTotals(Long branchId, LocalDate from, LocalDate to);
+
     @Query("select coalesce(sum(e.amount), 0) from LedgerEntry e where e.branch.id = :branchId and e.source = :source and e.type in :types")
     BigDecimal sumBySource(Long branchId, Source source, List<TxType> types);
 

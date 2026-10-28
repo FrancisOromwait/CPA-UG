@@ -98,6 +98,18 @@ class SingleBranchTest {
         assertEquals("CPA Uganda", send(admin, "GET", "/api/reports/member-statement?memberId=" + member, null, 200).get("branchLine").asText());
         send(support, "POST", "/api/transactions", "{\"memberId\":" + member + ",\"type\":\"SAVINGS_DEPOSIT\",\"amount\":1}", 403);   // support only looks
 
+        // the dashboard: members, balances, cash held, twelve months of money in and out, the latest movements
+        JsonNode dash = send(cashier, "GET", "/api/reports/dashboard", null, 200);
+        assertEquals(1, dash.get("members").asInt());
+        assertEquals(1, dash.get("savers").asInt());
+        assertEquals(0, new java.math.BigDecimal("50000").compareTo(dash.get("savings").decimalValue()));
+        assertEquals(0, new java.math.BigDecimal("50000").compareTo(dash.get("cashTotal").decimalValue()));
+        assertEquals(12, dash.get("months").size());
+        assertEquals(0, new java.math.BigDecimal("50000").compareTo(dash.get("months").get(11).get("moneyIn").decimalValue()));
+        assertEquals("M1", dash.get("recent").get(0).get("memberNo").asText());
+        assertEquals(true, dash.get("recent").get(0).get("moneyIn").asBoolean());
+        assertEquals(1, send(support, "GET", "/api/reports/dashboard", null, 200).get("members").asInt());
+
         // the cashbook: the deposit came in as cash from the member; cash then banked by journal is a transfer, not new money
         JsonNode bookAccounts = send(cashier, "GET", "/api/reports/cashbook-accounts", null, 200);
         long cashId = 0, bankId = 0;

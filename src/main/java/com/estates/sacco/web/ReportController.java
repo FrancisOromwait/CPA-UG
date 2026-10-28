@@ -15,6 +15,7 @@ import org.springframework.web.bind.annotation.RestController;
 public class ReportController {
     private final ReportService reports;
     private final BranchScope scope;
+    private final com.estates.sacco.service.DashboardService dashboard;
 
     /**
      * Manager: every branch plus group totals (or one branch via branchId).
@@ -23,5 +24,11 @@ public class ReportController {
     @GetMapping("/summary")
     ConsolidatedReport summary(@RequestParam(required = false) Long branchId) {
         return reports.summary(scope.readBranch(branchId));
+    }
+
+    /** Everything the dashboard shows (branch staff: their own branch; support: every branch). */
+    @GetMapping("/dashboard")
+    com.estates.sacco.service.DashboardService.Dashboard dashboard(@RequestParam(required = false) Long branchId) {
+        return dashboard.build(scope.readBranch(branchId));
     }
 }

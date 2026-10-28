@@ -351,7 +351,121 @@ window.addEventListener('hashchange', route);
 /* ------------------------------------------------------------------ dashboard */
 const stat = (cls, l, v) => `<div class="stat ${cls}"><div class="l">${esc(l)}</div><div class="v">${v}</div></div>`;
 
+/** Big amounts shortened for the cards and chart axis: 4.22 bn, 15.3 m, 250 k (the full figure shows on hover). */
+const compact = n => {
+  const v = Number(n || 0), a = Math.abs(v);
+  return a >= 1e9 ? (v / 1e9).toFixed(2) + ' bn' : a >= 1e6 ? (v / 1e6).toFixed(1) + ' m' : a >= 1e3 ? Math.round(v / 1e3) + ' k' : String(Math.round(v));
+};
+
+/** A figure card with an icon: the short amount large, the full amount on hover, a small line under it. */
+const kpi = (icon, label, value, full, sub, href) =>
+  `<${href ? `a href="${href}"` : 'div'} class="kpi"${full ? ` title="${esc(full)}"` : ''}>` +
+  `<span class="kpi-ic"><svg viewBox="0 0 24 24" aria-hidden="true">${ICONS[icon] || ''}</svg></span>` +
+  `<span class="kpi-txt"><span class="kpi-l">${esc(label)}</span><span class="kpi-v">${value}</span>${sub ? `<span class="kpi-s">${sub}</span>` : ''}</span>` +
+  `</${href ? 'a' : 'div'}>`;
+
+/** Money in (blue) and money out (black) for each month, as bars with a tooltip; the figures are also given as a table below it. */
+function flowChart(months) {
+  const W = 720, H = 250, L = 52, R = 8, T = 12, B = 30;
+  const max = Math.max(1, ...months.flatMap(m => [Number(m.moneyIn), Number(m.moneyOut)]));
+  // a round top for the axis: 1, 2 or 5 times a power of ten, four lines
+  const raw = max / 4, p = Math.pow(10, Math.floor(Math.log10(raw))), step = [1, 2, 5, 10].map(x => x * p).find(x => x >= raw);
+  const top = step * 4, y = v => T + (H - T - B) * (1 - v / top);
+  const slot = (W - L - R) / months.length, bw = Math.min(18, (slot - 10) / 2);
+  const bar = (x, v, cls) => {
+    const h = Math.max(0, y(0) - y(v)); if (h < 0.5) return '';
+    const r = Math.min(4, h, bw / 2), yt = y(v), yb = y(0);
+    return `<path class="${cls}" d="M${x},${yb}V${yt + r}Q${x},${yt} ${x + r},${yt}H${x + bw - r}Q${x + bw},${yt} ${x + bw},${yt + r}V${yb}Z"/>`;
+  };
+  let svg = '';
+  for (let i = 0; i <= 4; i++) {
+    const v = step * i;
+    svg += `<line class="grid" x1="${L}" x2="${W - R}" y1="${y(v)}" y2="${y(v)}"/><text class="ax" x="${L - 6}" y="${y(v) + 4}" text-anchor="end">${compact(v)}</text>`;
+  }
+  months.forEach((m, i) => {
+    const x0 = L + slot * i + (slot - bw * 2 - 2) / 2;
+    const [mon, yr] = m.label.split(' ');
+    svg += bar(x0, Number(m.moneyIn), 'in') + bar(x0 + bw + 2, Number(m.moneyOut), 'out') +
+      `<text class="ax" x="${L + slot * i + slot / 2}" y="${H - 10}" text-anchor="middle">${esc(mon)}${i === 0 || mon === 'Jan' ? ' ' + esc(yr.slice(2)) : ''}</text>` +
+      `<rect class="hit" data-i="${i}" x="${L + slot * i}" y="${T}" width="${slot}" height="${H - T - B}"/>`;
+  });
+  return `<div class="chart-wrap"><svg class="chart" viewBox="0 0 ${W} ${H}" role="img" aria-label="Money in and out for the last twelve months">${svg}</svg>` +
+    `<div class="chart-tip" hidden></div></div>`;
+}
+
 views.dashboard = async el => {
+  const d = await api('/api/reports/dashboard');
+  const hour = new Date().getHours();
+  const hello = hour < 12 ? 'Good morning' : hour < 17 ? 'Good afternoon' : 'Good evening';
+  const first = String(S.me.fullName || S.me.username).split(/[\s,]+/)[0];
+  const ugx = n => 'UGX ' + compact(n);
+  const thisMonth = d.months[d.months.length - 1];
+  el.innerHTML =
+    `<div class="dash-hello"><div><h3>${esc(hello)}, ${esc(first)}</h3>` +
+    `<p class="muted">${esc(new Date().toLocaleDateString('en-GB', { weekday: 'long', day: 'numeric', month: 'long', year: 'numeric' }))}</p></div>` +
+    (isMgr() ? '' : `<div class="quick"><a class="btn primary" href="#deposits">+ Regular deposit</a><a class="btn" href="#loans">Loan applications</a>` +
+      `<a class="btn" href="#members">Member list</a><a class="btn" href="#reports/cashbook-receipts">Cashbook</a></div>`) + `</div>` +
+
+    `<div class="kpis">` +
+    kpi('members', 'Members', d.members.toLocaleString('en-US'), '', `${d.activeMembers.toLocaleString('en-US')} active`, '#members') +
+    kpi('deposits', 'Savings', ugx(d.savings), 'UGX ' + money(d.savings), `${d.savers.toLocaleString('en-US')} savers · interest owed ${compact(d.savingsInterest)}`, '#reports/savings-report') +
+    kpi('reports/shares-report', 'Shares', ugx(d.shares), 'UGX ' + money(d.shares), 'paid-up share capital', '#reports/shares-report') +
+    kpi('loans', 'Loans outstanding', ugx(d.loans), 'UGX ' + money(d.loans), `${d.borrowers.toLocaleString('en-US')} borrowers`, '#reports/loan-report') +
+    kpi('interest', 'Loan interest owed', ugx(d.loanInterest), 'UGX ' + money(d.loanInterest), 'charged, not yet paid', '#reports/loan-report') +
+    kpi('payroll', 'Cash & bank', ugx(d.cashTotal), 'UGX ' + money(d.cashTotal), `${d.cash.length} accounts`, '#reports/cashbook-receipts') +
+    `</div>` +
+
+    `<div class="dash-grid">` +
+    `<div class="panel"><div class="panel-head"><h3>Money in and out · last 12 months</h3>` +
+    `<div class="legend"><span><i class="sw in"></i>Money in from members</span><span><i class="sw out"></i>Money out to members</span></div></div>` +
+    flowChart(d.months) +
+    `<p class="muted small-note">This month so far: in <strong>UGX ${money(thisMonth.moneyIn)}</strong>, out <strong>UGX ${money(thisMonth.moneyOut)}</strong>. ` +
+    `In: savings, shares, membership and loan repayments. Out: withdrawals, refunds and loans paid out.</p>` +
+    `<details class="figs"><summary>Show the figures</summary>` + table([
+      { h: 'Month', f: r => esc(r.label) }, { h: 'Money in', num: 1, f: r => money(r.moneyIn) }, { h: 'Money out', num: 1, f: r => money(r.moneyOut) },
+      { h: 'Difference', num: 1, f: r => money(Number(r.moneyIn) - Number(r.moneyOut)) }], d.months) + `</details></div>` +
+
+    `<div class="panel"><h3>Cash and bank</h3>` +
+    (d.cash.length ? `<div class="cash-list">${d.cash.map(c => `<div class="cash-row"><span><strong>${esc(c.code)}</strong> ${esc(c.name)}</span>` +
+      `<span class="num">${money(c.balance)}</span></div>`).join('')}` +
+      `<div class="cash-row total"><span>Total</span><span class="num">${money(d.cashTotal)}</span></div></div>` : '<div class="empty">Nothing held yet.</div>') +
+    `</div></div>` +
+
+    `<div class="dash-grid">` +
+    `<div class="panel"><h3>Latest money in and out</h3>` + table([
+      { h: 'Date', f: r => esc(r.date) },
+      { h: 'Member', f: r => `${esc(r.memberNo)} – ${esc(r.memberName)}` },
+      { h: 'What', f: r => `<span class="badge ${r.moneyIn ? 'in' : 'out'}">${r.moneyIn ? '↓ In' : '↑ Out'}</span> ${esc(r.type)}` },
+      { h: 'Amount', num: 1, f: r => money(r.amount) }], d.recent) + `</div>` +
+    `<div class="panel"><h3>Needs attention</h3><div class="todo">` +
+    `<a class="todo-row" href="#loans"><span class="todo-n">${d.pendingLoans}</span><span>loan application${d.pendingLoans === 1 ? '' : 's'} waiting for a decision</span></a>` +
+    `<a class="todo-row" href="#members"><span class="todo-n">${(d.members - d.activeMembers).toLocaleString('en-US')}</span><span>inactive member${d.members - d.activeMembers === 1 ? '' : 's'}</span></a>` +
+    `<a class="todo-row" href="#reports/savings-report"><span class="todo-n">${compact(d.savingsInterest)}</span><span>savings interest owed to members (UGX)</span></a>` +
+    `</div></div></div>` +
+    (S.single ? '' : '<div id="branchSummary"></div>');
+
+  // the chart's tooltip: the month under the pointer, with both figures
+  const wrap = $('.chart-wrap', el), tip = $('.chart-tip', el);
+  wrap.querySelectorAll('.hit').forEach(h => {
+    h.addEventListener('mouseenter', () => {
+      const m = d.months[Number(h.dataset.i)];
+      tip.innerHTML = `<strong>${esc(m.label)}</strong><span><i class="sw in"></i>In ${money(m.moneyIn)}</span><span><i class="sw out"></i>Out ${money(m.moneyOut)}</span>`;
+      tip.hidden = false;
+      h.classList.add('on');
+    });
+    h.addEventListener('mousemove', e => {
+      const box = wrap.getBoundingClientRect();
+      tip.style.left = Math.min(box.width - tip.offsetWidth - 4, Math.max(4, e.clientX - box.left + 12)) + 'px';
+      tip.style.top = Math.max(4, e.clientY - box.top - tip.offsetHeight - 10) + 'px';
+    });
+    h.addEventListener('mouseleave', () => { tip.hidden = true; h.classList.remove('on'); });
+  });
+
+  if (!S.single) await branchSummary($('#branchSummary'));
+};
+
+/** Several branches: every branch on one line with totals (not needed with one branch). */
+async function branchSummary(el) {
   const rep = await api('/api/reports/summary');
   const t = rep.totals;
   const cols = [
@@ -369,13 +483,8 @@ views.dashboard = async el => {
     ? `<tfoot><tr><td colspan="2">Group total</td><td class="num">${t.members}</td><td class="num">${money(t.savings)}</td><td class="num">${money(t.shares)}</td>` +
       `<td class="num">${money(t.loansDisbursed)}</td><td class="num">${money(t.loanRepayments)}</td><td class="num">${money(t.loanOutstanding)}</td><td class="num">${money(t.payrollCollected)}</td></tr></tfoot>`
     : '';
-  el.innerHTML =
-    `<div class="cards">${stat('', 'Savings', money(t.savings))}${stat('b2', 'Shares', money(t.shares))}` +
-    `${stat('b3', 'Loans outstanding', money(t.loanOutstanding))}${stat('b4', 'Payroll collected', money(t.payrollCollected))}` +
-    `${stat('b5', 'Members', t.members)}${stat('', 'Active loans', t.activeLoans)}</div>` +
-    // with one branch the table only repeats the cards above, so a one-branch installation does not show it
-    (S.single && !isMgr() ? '' : `<div class="panel"><h3>${isMgr() ? 'Every branch' : 'Branch summary'}</h3>${table(cols, rep.branches, foot)}</div>`);
-};
+  el.innerHTML = `<div class="panel"><h3>${isMgr() ? 'Every branch' : 'Branch summary'}</h3>${table(cols, rep.branches, foot)}</div>`;
+}
 
 /* ------------------------------------------------------------------ branches (manager) */
 views.branches = async el => {

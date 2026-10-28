@@ -20,6 +20,7 @@ public interface LoanRepository extends JpaRepository<Loan, Long> {
     List<Loan> search(Long branchId, LoanStatus status);
 
     long countByBranchIdAndStatus(Long branchId, LoanStatus status);
+    long countByStatus(LoanStatus status);
 
     /** Total principal plus interest owed on every loan that has been paid out. */
     @Query("""
