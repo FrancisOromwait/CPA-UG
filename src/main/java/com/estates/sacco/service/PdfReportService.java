@@ -36,7 +36,7 @@ public class PdfReportService {
         return render(doc, generatedBy, null);
     }
 
-    /** {@code photo}: a JPEG shown round, in the middle above the heading (the member's photo on their statement), or null for none. */
+    /** {@code photo}: a JPEG shown round in the top right corner beside the heading (the member's photo on their statement), or null for none. */
     public byte[] render(ReportDoc doc, String generatedBy, byte[] photo) {
         ByteArrayOutputStream out = new ByteArrayOutputStream();
         // the member statement has a column for every kind of account, so it is printed wide with a line round every cell;
@@ -54,8 +54,13 @@ public class PdfReportService {
             d.setFooter(footer);
             d.open();
 
+            // the member's photo in the top right corner of the first page, beside the heading
             Image picture = roundPicture(writer, photo);
-            if (picture != null) d.add(picture);
+            if (picture != null) {
+                picture.setAbsolutePosition(d.getPageSize().getWidth() - d.rightMargin() - picture.getScaledWidth(),
+                        d.getPageSize().getHeight() - d.topMargin() - picture.getScaledHeight());
+                d.add(picture);
+            }
             // the member statement's heading lines are centred
             int align = grid ? Element.ALIGN_CENTER : Element.ALIGN_LEFT;
             d.add(line(settings.getAppName(), font(Font.BOLD, 9, Color.GRAY), align));
@@ -82,7 +87,7 @@ public class PdfReportService {
     }
 
     /**
-     * The photo cut to a circle with a thin blue ring, 80 points across and placed in the middle of the page. The picture fills the
+     * The photo cut to a circle with a thin blue ring, 80 points across (the caller places it on the page). The picture fills the
      * circle (its middle is kept when it is not square). Null when there is none or it cannot be read (the PDF is made without it).
      */
     private static Image roundPicture(PdfWriter writer, byte[] photo) {
@@ -101,10 +106,7 @@ public class PdfReportService {
             t.setLineWidth(2.5f);
             t.circle(r, r, r - 1.25f);
             t.stroke();
-            Image round = Image.getInstance(t);
-            round.setAlignment(Element.ALIGN_CENTER);
-            round.setSpacingAfter(6);
-            return round;
+            return Image.getInstance(t);
         } catch (Exception e) {
             return null;
         }
