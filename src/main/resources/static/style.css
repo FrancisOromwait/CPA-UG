@@ -134,6 +134,9 @@ input:disabled { background: var(--blue-soft); color: var(--muted); }
 /* report heading with branch totals */
 .report-head .rep-title { font-size: 20px; margin: 4px 0; color: var(--blue); }
 .report-head .rep-branch { font-weight: 700; font-size: 16px; }
+/* the member statement: headings in the middle (the figure boxes stay as they are) */
+.report-head.centered > div:not(.rep-totals), .report-head.centered > .rep-title, .report-head.centered > p { text-align: center; }
+.panel h3.center { text-align: center; }
 
 /* member photos: a round photo in the middle, at the top of the member's page (with the buttons to change it) and of a member statement */
 .member-head { display: flex; flex-direction: column; align-items: center; gap: 14px; }

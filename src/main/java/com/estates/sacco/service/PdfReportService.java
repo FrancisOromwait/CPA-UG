@@ -56,13 +56,15 @@ public class PdfReportService {
 
             Image picture = roundPicture(writer, photo);
             if (picture != null) d.add(picture);
-            d.add(new Paragraph(settings.getAppName(), font(Font.BOLD, 9, Color.GRAY)));
-            Paragraph title = new Paragraph(doc.title(), font(Font.BOLD, 18, BRAND));
+            // the member statement's heading lines are centred
+            int align = grid ? Element.ALIGN_CENTER : Element.ALIGN_LEFT;
+            d.add(line(settings.getAppName(), font(Font.BOLD, 9, Color.GRAY), align));
+            Paragraph title = line(doc.title(), font(Font.BOLD, 18, BRAND), align);
             title.setSpacingBefore(2);
             d.add(title);
-            d.add(new Paragraph(doc.branchLine(), font(Font.BOLD, 12, Color.BLACK)));
-            if (doc.subjectLine() != null) d.add(new Paragraph(doc.subjectLine(), font(Font.NORMAL, 11, Color.BLACK)));
-            d.add(new Paragraph(doc.periodLine(), font(Font.NORMAL, 10, Color.DARK_GRAY)));
+            d.add(line(doc.branchLine(), font(Font.BOLD, 12, Color.BLACK), align));
+            if (doc.subjectLine() != null) d.add(line(doc.subjectLine(), font(Font.NORMAL, 11, Color.BLACK), align));
+            d.add(line(doc.periodLine(), font(Font.NORMAL, 10, Color.DARK_GRAY), align));
 
             if (!doc.totals().isEmpty()) d.add(totalsBox(doc.totals()));
             if (doc.note() != null) {
@@ -133,7 +135,7 @@ public class PdfReportService {
     }
 
     private void addSection(Document d, Section s, boolean grid) throws DocumentException {
-        Paragraph h = new Paragraph(s.heading(), font(Font.BOLD, 11, BRAND));
+        Paragraph h = line(s.heading(), font(Font.BOLD, 11, BRAND), grid ? Element.ALIGN_CENTER : Element.ALIGN_LEFT);
         h.setSpacingBefore(14);
         h.setSpacingAfter(4);
         d.add(h);
@@ -202,6 +204,12 @@ public class PdfReportService {
         c.setHorizontalAlignment(right ? Element.ALIGN_RIGHT : Element.ALIGN_LEFT);
         if (bg != null) c.setBackgroundColor(bg);
         return c;
+    }
+
+    private static Paragraph line(String text, Font f, int align) {
+        Paragraph p = new Paragraph(text, f);
+        p.setAlignment(align);
+        return p;
     }
 
     private static Font font(int style, float size, Color color) {

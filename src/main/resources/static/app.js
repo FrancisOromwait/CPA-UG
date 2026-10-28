@@ -1048,9 +1048,10 @@ function renderDoc(doc) {
       ? s.rows.map(r => `<tr>${r.map((v, i) => cell(v, s.columns[i])).join('')}</tr>`).join('')
       : `<tr><td colspan="${s.columns.length}" class="muted">No entries</td></tr>`;
     const foot = s.totalRow ? `<tfoot><tr>${s.totalRow.map((v, i) => cell(v, s.columns[i])).join('')}</tr></tfoot>` : '';
-    return `<div class="panel"><h3>${esc(s.heading)}</h3><div class="tbl-wrap"><table${grid ? ' class="grid"' : ''}><thead><tr>${head}</tr></thead><tbody>${body}</tbody>${foot}</table></div></div>`;
+    return `<div class="panel"><h3${grid ? ' class="center"' : ''}>${esc(s.heading)}</h3><div class="tbl-wrap"><table${grid ? ' class="grid"' : ''}><thead><tr>${head}</tr></thead><tbody>${body}</tbody>${foot}</table></div></div>`;
   }).join('');
-  return `<div class="panel report-head"><div class="muted">${esc(S.appName)}</div>` +
+  // the member statement's headings are centred
+  return `<div class="panel report-head${grid ? ' centered' : ''}"><div class="muted">${esc(S.appName)}</div>` +
     `<h3 class="rep-title">${esc(doc.title)}</h3><div class="rep-branch">${esc(doc.branchLine)}</div>` +
     (doc.subjectLine ? `<div>${esc(doc.subjectLine)}</div>` : '') + `<div class="muted">${esc(doc.periodLine)}</div>` +
     `<div class="rep-totals">${doc.totals.map(t => `<div class="rep-total"><span>${esc(t.label)}</span><strong>${esc(t.value)}</strong></div>`).join('')}</div>` +
