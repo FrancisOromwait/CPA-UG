@@ -16,4 +16,4 @@ Everyone can change their own password with **Change password** (bottom left).
 * **admin** (branch administrator): everything in the branch, including the chart of accounts, mobile money numbers and creating treasurers and cashiers.
 * **treasurer / cashier**: the same as the administrator except managing users and the chart.
 * **member**: only their own statement.
-* **support**: for whoever looks after the system. Not shown on the login page: open `http://localhost:8082/#support`.
+* **support**: for whoever looks after the system. Signs in on the normal login page with its username and password.

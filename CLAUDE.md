@@ -11,7 +11,7 @@ A one-branch sacco system for the client **CPA Uganda**. It was made as a **copy
 * Settings in `src/main/resources/application.properties`: port **8082**, database **cpa_uganda**, `sacco.single-branch.*`, `sacco.app-name=CPA Uganda`. The class that reads them is `service/DeploymentSettings.java`.
 * On first start `BootstrapRunner` creates the branch CPA Uganda (code CPA001), the administrator `admin`, and a support manager `support`. With no password set, random ones are written once to the start-up log.
 * There is no manager in daily use. The branch administrator keeps the chart of accounts and the mobile money numbers (`SecurityConfig`, `MobileMoneyController`).
-* The login page shows no branch list. The support login is reached by adding `#support` to the address.
+* The login page asks only for username and password, for every account including the support login: the role comes from the account itself (app.js `oneBranchLogin`).
 * Dashboard for CPA (`DashboardService`, `GET /api/reports/dashboard`, `views.dashboard` in app.js): greeting and quick buttons, six figure cards (members, savings, shares, loans outstanding, loan interest owed, cash & bank; the member summary's figures), a 12-month money in / money out bar chart (blue / black, tooltip, figures table), cash and bank balances, latest money movements, and "needs attention" (pending loan applications). The old per-branch table shows only with several branches.
 * Removed for CPA: the dashboard "Branch summary" table, the Sacco ID on report headings (`FinancialReportService.branchLine`, `LoanScheduleService`), the Balance column on the General ledger screen.
 * Added for CPA: "Change password" for every non-member login (`PUT /api/me/password`).

@@ -148,7 +148,8 @@ async function loadConfig() {
 }
 
 /** One branch and not the support address: there is no branch to choose, and signing in does not wait for the branch list. */
-const oneBranchLogin = () => S.single && location.hash !== '#support';   // the support login is reached by adding #support to the address
+/** One branch: the login form asks only for username and password; the account itself says what it is (support included). */
+const oneBranchLogin = () => S.single;
 
 async function loadLoginBranches() {
   const s = $('#loginBranch'), field = s.closest('label');
@@ -186,7 +187,7 @@ $('#loginForm').addEventListener('submit', async e => {
     // The account must belong to the branch chosen on the form (one branch: every branch login belongs to it)
     const chosen = f.get('branch');
     if (oneBranchLogin()) {
-      if (isMgr()) throw new Error('The manager signs in under Head office.');
+      // nothing is chosen on the form: every account, the support login included, signs in as itself
     } else if (chosen === HQ) {
       if (!isMgr()) throw new Error('This is a branch account. Select your branch instead.');
     } else if (isMgr() || String(S.me.branchId) !== chosen) {
