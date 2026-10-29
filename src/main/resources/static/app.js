@@ -105,6 +105,8 @@ function showLogin(msg) {
   const e = $('#loginError');
   e.hidden = !msg;
   e.textContent = msg || '';
+  // a login locked after too many wrong passwords: the message shows in red
+  e.classList.toggle('locked', /^Too many failed login attempts/.test(msg || ''));
 }
 
 function signOut() {

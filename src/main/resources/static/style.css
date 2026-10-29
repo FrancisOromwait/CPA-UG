@@ -53,6 +53,8 @@ input:disabled { background: var(--blue-soft); color: var(--muted); }
   background: var(--black); color: var(--white); border-radius: 8px;
   padding: 10px 12px; font-size: 14px; margin-bottom: 14px; border-left: 4px solid var(--blue-bright);
 }
+/* a login locked after too many wrong passwords: in red (the owner's wish; the one place red is used) */
+.error.locked { background: #b91c1c; border-left-color: #7f1d1d; font-weight: 600; }
 
 /* branch logo: initials on black or a shade of blue, chosen from the Sacco ID */
 .mark {

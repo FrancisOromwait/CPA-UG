@@ -247,6 +247,9 @@ class SingleBranchTest {
         for (int i = 0; i < 4; i++) send(wrong, "GET", "/api/me", null, 401);                   // the 4th in a row locks it
         JsonNode lockedAnswer = send(httpBasic("cash3", "cash-pass-3"), "GET", "/api/me", null, 401);
         org.junit.jupiter.api.Assertions.assertTrue(lockedAnswer.get("error").asText().contains("locked"), "even the right password is refused");
+        assertEquals("Too many failed login attempts(4). Your account has been temporarily locked for security purposes!!! "
+                + "contact PEARL ACCOUNTING SOLUTIONS OR ADMINISTRATOR TO RESET YOUR PASSWORD.", lockedAnswer.get("error").asText());
+        assertEquals(true, lockedAnswer.get("locked").asBoolean());
         boolean shownLocked = false;
         for (JsonNode u : send(admin2, "GET", "/api/users", null, 200)) if (u.get("username").asText().equals("cash3")) shownLocked = u.get("locked").asBoolean();
         assertEquals(true, shownLocked);

@@ -19,6 +19,10 @@ import org.springframework.security.web.util.matcher.AnyRequestMatcher;
 
 @Configuration
 public class SecurityConfig {
+    /** What someone sees when their login is locked after too many wrong passwords (the owner's wording). */
+    static final String LOCKED_MESSAGE = "Too many failed login attempts(" + LoginGuard.MAX_TRIES + "). Your account has been temporarily locked "
+            + "for security purposes!!! contact PEARL ACCOUNTING SOLUTIONS OR ADMINISTRATOR TO RESET YOUR PASSWORD.";
+
     /**
      * Where the page may load things from: only this site. Styles may be written in the page (the screens set some sizes that way);
      * pictures may also be data and blob addresses (the icon, member photos, PDFs opened in the browser).
@@ -55,9 +59,9 @@ public class SecurityConfig {
             .httpBasic(b -> b.authenticationEntryPoint((req, res, ex) -> {
                 res.setStatus(401);
                 res.setContentType("application/json");
+                // a locked login: the owner's own wording, marked "locked" so the login page shows it in red
                 res.getWriter().write(ex instanceof LockedException
-                        ? "{\"error\":\"This login is locked after " + LoginGuard.MAX_TRIES + " wrong passwords. Ask the administrator to reset the password"
-                          + " (an administrator's own login: ask the support login). The support login itself opens again after 30 minutes.\"}"
+                        ? "{\"error\":\"" + LOCKED_MESSAGE + "\",\"locked\":true}"
                         : "{\"error\":\"Invalid username or password\"}");
             }))
             .authorizeHttpRequests(a -> a
