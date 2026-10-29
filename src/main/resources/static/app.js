@@ -203,8 +203,16 @@ $('#loginForm').addEventListener('submit', async e => {
   } catch (err) {
     S.auth = null;
     S.me = null;
+    // the password is typed again: a wrong one must never be sent on under the next username tried
+    $('input[name=password]', e.target).value = '';
     showLogin(err.message.startsWith('Request failed') ? 'Cannot reach the server. Try again.' : err.message);
   } finally { btn.disabled = false; }
+});
+// another username: the last person's message (e.g. "locked") is not about this one, so it goes
+$('input[name=username]', $('#loginForm')).addEventListener('input', () => {
+  const e = $('#loginError');
+  e.hidden = true;
+  e.classList.remove('locked');
 });
 
 $('#logout').addEventListener('click', signOut);
