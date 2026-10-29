@@ -26,7 +26,7 @@ import java.time.Instant;
 @Slf4j
 public class LoginGuard {
     public static final int MAX_TRIES = 4;
-    public static final Duration SUPPORT_LOCK = Duration.ofMinutes(30);
+    public static final Duration SUPPORT_LOCK = Duration.ofMinutes(10);
 
     private final UserRepository users;
     private final AuditService audit;
@@ -46,7 +46,7 @@ public class LoginGuard {
                 u.setLockedAt(Instant.now());
                 log.warn("Login '{}' locked after {} wrong passwords in a row", u.getUsername(), u.getFailedLogins());
                 audit.logSystem(u.getBranch(), "LOCK", "Login", u.getId(), "Login " + u.getUsername() + " locked after " + MAX_TRIES
-                        + " wrong passwords" + (u.getRole() == Role.MANAGER ? " (opens again after 30 minutes)"
+                        + " wrong passwords" + (u.getRole() == Role.MANAGER ? " (opens again after " + SUPPORT_LOCK.toMinutes() + " minutes)"
                         : u.getRole() == Role.BRANCH_ADMIN ? " (the support login unlocks it)" : " (the branch admin or the support login unlocks it)"));
             }
             users.save(u);

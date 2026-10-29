@@ -41,7 +41,7 @@ public class AppUser {
     @Column(nullable = false, columnDefinition = "int not null default 0")
     private int failedLogins;
 
-    /** Locked after too many wrong passwords, until the support login resets the password (the support login itself: for 30 minutes). */
+    /** Locked after too many wrong passwords, until the support login resets the password (the support login itself: for 10 minutes, LoginGuard.SUPPORT_LOCK). */
     @Column(nullable = false, columnDefinition = "bit not null default 0")
     private boolean locked;
 
