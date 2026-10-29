@@ -225,5 +225,36 @@ class SingleBranchTest {
         send(httpBasic("admin", "brand-new-pass"), "GET", "/api/me", null, 200);
         send(cashier, "PUT", "/api/me/password", "{\"currentPassword\":\"cash-pass-1\",\"password\":\"cash-pass-2\"}", 200);
         send(httpBasic("cash1", "cash-pass-2"), "GET", "/api/me", null, 200);
+
+        // ================= protections on every answer, refusals included =================
+        var page = mvc.perform(get("/")).andReturn().getResponse();
+        org.junit.jupiter.api.Assertions.assertTrue(page.getHeader("Content-Security-Policy").contains("default-src 'self'"));
+        org.junit.jupiter.api.Assertions.assertTrue(page.getHeader("Strict-Transport-Security").contains("max-age=31536000"));
+        assertEquals("no-referrer", page.getHeader("Referrer-Policy"));
+        assertEquals("same-origin", page.getHeader("Cross-Origin-Opener-Policy"));
+        org.junit.jupiter.api.Assertions.assertTrue(page.getHeader("Permissions-Policy").contains("microphone=()"));
+        var refused = mvc.perform(get("/api/me").with(httpBasic("nobody", "x"))).andReturn().getResponse();
+        assertEquals(401, refused.getStatus());
+        org.junit.jupiter.api.Assertions.assertNotNull(refused.getHeader("Content-Security-Policy"));
+        assertEquals("DENY", refused.getHeader("X-Frame-Options"));
+
+        // ================= 4 wrong passwords in a row lock a login; only the support login unlocks it =================
+        RequestPostProcessor admin2 = httpBasic("admin", "brand-new-pass");
+        long cash3 = send(admin2, "POST", "/api/users", "{\"username\":\"cash3\",\"password\":\"cash-pass-3\",\"fullName\":\"Cash Three\",\"role\":\"CASHIER\"}", 201).get("id").asLong();
+        RequestPostProcessor wrong = httpBasic("cash3", "not-it");
+        for (int i = 0; i < 3; i++) send(wrong, "GET", "/api/me", null, 401);
+        send(httpBasic("cash3", "cash-pass-3"), "GET", "/api/me", null, 200);                   // a right password starts the count again
+        for (int i = 0; i < 4; i++) send(wrong, "GET", "/api/me", null, 401);                   // the 4th in a row locks it
+        JsonNode lockedAnswer = send(httpBasic("cash3", "cash-pass-3"), "GET", "/api/me", null, 401);
+        org.junit.jupiter.api.Assertions.assertTrue(lockedAnswer.get("error").asText().contains("locked"), "even the right password is refused");
+        boolean shownLocked = false;
+        for (JsonNode u : send(admin2, "GET", "/api/users", null, 200)) if (u.get("username").asText().equals("cash3")) shownLocked = u.get("locked").asBoolean();
+        assertEquals(true, shownLocked);
+        send(admin2, "PUT", "/api/users/" + cash3 + "/password", "{\"password\":\"admin-sets-it\"}", 403);     // not the administrator
+        send(support, "PUT", "/api/users/" + cash3 + "/password", "{\"password\":\"support-sets-1\"}", 200);
+        send(httpBasic("cash3", "support-sets-1"), "GET", "/api/me", null, 200);
+        boolean lockAudited = false;
+        for (JsonNode a : send(admin2, "GET", "/api/audit", null, 200)) lockAudited |= a.get("action").asText().equals("LOCK");
+        assertEquals(true, lockAudited);
     }
 }

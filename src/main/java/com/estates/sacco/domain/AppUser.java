@@ -36,4 +36,14 @@ public class AppUser {
     private Member member;
 
     private boolean enabled = true;
+
+    /** Wrong passwords in a row; a right one sets it back to 0. At {@code LoginGuard.MAX_TRIES} the login is locked. */
+    @Column(nullable = false, columnDefinition = "int not null default 0")
+    private int failedLogins;
+
+    /** Locked after too many wrong passwords, until the support login resets the password (the support login itself: for 30 minutes). */
+    @Column(nullable = false, columnDefinition = "bit not null default 0")
+    private boolean locked;
+
+    private java.time.Instant lockedAt;
 }

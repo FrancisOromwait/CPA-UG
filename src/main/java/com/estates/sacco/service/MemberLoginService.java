@@ -59,6 +59,7 @@ public class MemberLoginService {
         AppUser u = ensureLogin(m);
         u.setPasswordHash(encoder.encode(name(m)));
         u.setEnabled(true);
+        com.estates.sacco.security.LoginGuard.clear(u);       // a locked login opens again (the caller has checked who may do that)
         return users.save(u).getUsername();
     }
 

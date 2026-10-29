@@ -116,8 +116,15 @@ public class MemberController {
     @Transactional
     MemberDto resetLogin(@PathVariable Long id) {
         Member m = ledgerService.requireMember(id);
+        // a login locked after too many wrong passwords is opened again by the support login only
+        boolean wasLocked = logins.loginOf(m).map(com.estates.sacco.domain.AppUser::isLocked).orElse(false);
+        if (wasLocked && !scope.isManager()) {
+            throw new ApiException(HttpStatus.FORBIDDEN, "This member's login is locked after " + com.estates.sacco.security.LoginGuard.MAX_TRIES
+                    + " wrong passwords. Only the support login can unlock it with Reset login.");
+        }
         String login = logins.reset(m);
-        audit.log(m.getBranch(), "EDIT", "Member login", m.getId(), "Login " + login + " reset to the first password");
+        audit.log(m.getBranch(), "EDIT", "Member login", m.getId(),
+                "Login " + login + (wasLocked ? " unlocked and" : "") + " reset to the first password");
         return MemberDto.of(m).withLogin(login);
     }
 }

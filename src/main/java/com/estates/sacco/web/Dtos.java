@@ -24,13 +24,14 @@ public final class Dtos {
     public record UserReq(@NotBlank String username, @NotBlank @Size(min = 8) String password,
                           @NotBlank String fullName, @NotNull Role role, Long branchId) {}
 
+    /** {@code locked}: locked after too many wrong passwords (the support login unlocks it by resetting the password). */
     public record UserDto(Long id, String username, String fullName, Role role, Long branchId, String branchCode,
-                          String branchName, boolean enabled) {
+                          String branchName, boolean enabled, boolean locked) {
         public static UserDto of(AppUser u) {
             Branch b = u.getBranch();
             return new UserDto(u.getId(), u.getUsername(), u.getFullName(), u.getRole(),
                     b == null ? null : b.getId(), b == null ? null : b.getCode(),
-                    b == null ? null : b.getName(), u.isEnabled());
+                    b == null ? null : b.getName(), u.isEnabled(), u.isLocked());
         }
     }
 

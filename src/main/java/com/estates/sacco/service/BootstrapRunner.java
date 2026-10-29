@@ -44,6 +44,9 @@ public class BootstrapRunner implements ApplicationRunner {
     private String username;
     @Value("${sacco.bootstrap.manager.password}")
     private String password;
+    /** True (SUPPORT_RESET=true): on this start the support login's password is set to the one in the settings, and it is unlocked. */
+    @Value("${sacco.bootstrap.manager.reset-password:false}")
+    private boolean resetSupport;
 
     /**
      * Deposits recorded before parts were tied together: entries of one member, date, receipt and receiving account
@@ -116,6 +119,16 @@ public class BootstrapRunner implements ApplicationRunner {
             u.setRole(Role.MANAGER);
             users.save(u);
             log.warn("Created initial manager account '{}'. Change its password immediately.", username);
+        }
+        // a way back into the support login when its password is lost: set it from the settings (never written in a file)
+        if (resetSupport && password != null && !password.isBlank()) {
+            users.findByUsername(username).filter(u -> u.getRole() == Role.MANAGER).ifPresent(u -> {
+                u.setPasswordHash(encoder.encode(password));
+                u.setEnabled(true);
+                com.estates.sacco.security.LoginGuard.clear(u);
+                users.save(u);
+                log.warn("The password of the support login '{}' was set from the settings (SUPPORT_RESET). Remove SUPPORT_RESET now.", username);
+            });
         }
         if (settings.isSingleBranch()) seedSingleBranch();
         accountService.seedDefaults();                       // one chart for all branches

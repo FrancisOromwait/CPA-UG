@@ -8,10 +8,24 @@ import org.springframework.security.config.annotation.web.builders.HttpSecurity;
 import org.springframework.security.config.http.SessionCreationPolicy;
 import org.springframework.security.crypto.bcrypt.BCryptPasswordEncoder;
 import org.springframework.security.crypto.password.PasswordEncoder;
+import org.springframework.security.authentication.LockedException;
+import org.springframework.security.config.annotation.ObjectPostProcessor;
 import org.springframework.security.web.SecurityFilterChain;
+import org.springframework.security.web.header.HeaderWriterFilter;
+import org.springframework.security.web.header.writers.CrossOriginOpenerPolicyHeaderWriter;
+import org.springframework.security.web.header.writers.ReferrerPolicyHeaderWriter;
+import org.springframework.security.web.header.writers.StaticHeadersWriter;
+import org.springframework.security.web.util.matcher.AnyRequestMatcher;
 
 @Configuration
 public class SecurityConfig {
+    /**
+     * Where the page may load things from: only this site. Styles may be written in the page (the screens set some sizes that way);
+     * pictures may also be data and blob addresses (the icon, member photos, PDFs opened in the browser).
+     */
+    static final String CONTENT_SECURITY_POLICY = "default-src 'self'; script-src 'self'; style-src 'self' 'unsafe-inline'; "
+            + "img-src 'self' data: blob:; font-src 'self'; connect-src 'self'; object-src 'none'; base-uri 'self'; "
+            + "form-action 'self'; frame-ancestors 'none'";
 
     @Bean
     SecurityFilterChain filterChain(HttpSecurity http, DeploymentSettings settings) throws Exception {
@@ -20,11 +34,31 @@ public class SecurityConfig {
         http
             .csrf(c -> c.disable())
             .sessionManagement(s -> s.sessionCreationPolicy(SessionCreationPolicy.STATELESS))
+            // Protections the browser applies to every answer (refusals included, hence written straight away):
+            // HTTPS only, nothing loaded from other sites, no framing, no address passed on, no camera/microphone/location
+            // except the camera for member photos, and no other site's window able to reach this one.
+            .headers(h -> h
+                .withObjectPostProcessor(new ObjectPostProcessor<HeaderWriterFilter>() {
+                    @Override
+                    public <O extends HeaderWriterFilter> O postProcess(O filter) {
+                        filter.setShouldWriteHeadersEagerly(true);
+                        return filter;
+                    }
+                })
+                .httpStrictTransportSecurity(t -> t.includeSubDomains(true).maxAgeInSeconds(31_536_000).requestMatcher(AnyRequestMatcher.INSTANCE))
+                .contentSecurityPolicy(c -> c.policyDirectives(CONTENT_SECURITY_POLICY))
+                .referrerPolicy(r -> r.policy(ReferrerPolicyHeaderWriter.ReferrerPolicy.NO_REFERRER))
+                .crossOriginOpenerPolicy(o -> o.policy(CrossOriginOpenerPolicyHeaderWriter.CrossOriginOpenerPolicy.SAME_ORIGIN))
+                .addHeaderWriter(new StaticHeadersWriter("Permissions-Policy",
+                        "camera=(self), microphone=(), geolocation=(), payment=(), usb=()")))
             // No WWW-Authenticate header: the web app shows its own login form, not the browser popup.
             .httpBasic(b -> b.authenticationEntryPoint((req, res, ex) -> {
                 res.setStatus(401);
                 res.setContentType("application/json");
-                res.getWriter().write("{\"error\":\"Invalid username or password\"}");
+                res.getWriter().write(ex instanceof LockedException
+                        ? "{\"error\":\"This login is locked after " + LoginGuard.MAX_TRIES + " wrong passwords. Ask the support login to reset the password."
+                          + " (The support login itself opens again after 30 minutes.)\"}"
+                        : "{\"error\":\"Invalid username or password\"}");
             }))
             .authorizeHttpRequests(a -> a
                 // The web app itself (HTML/CSS/JS); data still requires login
@@ -46,6 +80,8 @@ public class SecurityConfig {
                 // SMS to members: the branch administrator sends; the manager (support) can look at what was sent
                 .requestMatchers(HttpMethod.POST, "/api/messages/**").hasRole("BRANCH_ADMIN")
                 .requestMatchers("/api/messages/**").hasAnyRole("MANAGER", "BRANCH_ADMIN")
+                // a member's login can be reset by staff, and by the support login (the only one that unlocks a locked login)
+                .requestMatchers(HttpMethod.POST, "/api/members/*/reset-login").hasAnyRole("MANAGER", "BRANCH_ADMIN", "TREASURER", "CASHIER")
                 .requestMatchers(HttpMethod.POST, "/api/branches/**").hasRole("MANAGER")
                 .requestMatchers(HttpMethod.PUT, "/api/branches/**").hasRole("MANAGER")
                 // Posting transactions: branch admins and their staff (manager is read-only oversight)

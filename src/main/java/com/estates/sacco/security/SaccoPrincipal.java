@@ -19,6 +19,10 @@ public class SaccoPrincipal implements UserDetails {
     private final Role role;
     private final Long branchId;
     private final boolean enabled;
+    /** Wrong passwords in a row before this sign-in, and whether the login was marked locked (a right password clears both). */
+    private final int failedLogins;
+    private final boolean lockedMark;
+    private final boolean accountNonLocked;
 
     public SaccoPrincipal(AppUser u) {
         this.userId = u.getId();
@@ -27,6 +31,14 @@ public class SaccoPrincipal implements UserDetails {
         this.role = u.getRole();
         this.branchId = u.getBranch() == null ? null : u.getBranch().getId();
         this.enabled = u.isEnabled() && (u.getBranch() == null || u.getBranch().isActive());
+        this.failedLogins = u.getFailedLogins();
+        this.lockedMark = u.isLocked();
+        this.accountNonLocked = !u.isLocked() || LoginGuard.lockOver(u);
+    }
+
+    @Override
+    public boolean isAccountNonLocked() {
+        return accountNonLocked;
     }
 
     @Override

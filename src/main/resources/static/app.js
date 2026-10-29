@@ -571,11 +571,16 @@ views.admins = async el => {
       { h: 'Full name', f: r => esc(r.fullName) },
       { h: 'Role', f: r => label(r.role) },
       ...(S.single ? [] : [{ h: 'Branch', f: r => esc(r.branchCode || 'All branches') }]),
-      { h: 'Status', f: r => `<span class="badge ${r.enabled ? 'ACTIVE' : 'REJECTED'}">${r.enabled ? 'Enabled' : 'Disabled'}</span>` },
+      { h: 'Status', f: r => `<span class="badge ${r.enabled ? 'ACTIVE' : 'REJECTED'}">${r.enabled ? 'Enabled' : 'Disabled'}</span>` +
+          (r.locked ? ' <span class="badge out" title="Locked after 4 wrong passwords">Locked</span>' : '') },
       { h: '', f: r => (isMgr() || ['TREASURER', 'CASHIER'].includes(r.role)) ? `<div class="actions">` +
           (r.id === S.me.id ? '' : `<button class="btn small" data-act="toggleUser" data-id="${r.id}" data-value="${!r.enabled}">${r.enabled ? 'Disable' : 'Enable'}</button>`) +
-          `<button class="btn small" data-act="resetPassword" data-id="${r.id}" data-name="${esc(r.username)}">Reset password</button></div>` : '' }
-    ], list) + '</div>';
+          // a locked login is unlocked by the support login only, with a new password
+          (r.locked && !isMgr() ? '<span class="muted">Locked: the support login unlocks it</span>'
+            : `<button class="btn small${r.locked ? ' primary' : ''}" data-act="resetPassword" data-id="${r.id}" data-name="${esc(r.username)}">` +
+              `${r.locked ? 'Unlock &amp; reset password' : 'Reset password'}</button>`) + `</div>` : '' }
+    ], list) + (list.some(r => r.locked)
+      ? `<p class="muted" style="margin:10px 0 0">A login is locked after 4 wrong passwords in a row. ${isMgr() ? 'Unlock it by giving it a new password.' : 'Ask the support login to unlock it.'}</p>` : '') + '</div>';
 };
 views.staff = views.admins;
 
@@ -601,7 +606,8 @@ views.members = async el => {
       { h: 'Phone', f: r => esc(r.phone || '') },
       { h: 'Employer', f: r => esc(r.employer || '') },
       { h: 'Payroll no.', f: r => esc(r.payrollNo || '') },
-      { h: '', f: r => rowBtns('member', r.id, isMgr() ? '' : `<button class="btn small" data-act="resetLogin" data-id="${r.id}" data-name="${esc(r.fullName)}">Reset login</button>`) }
+      // Reset login is for staff and for the support login (which alone unlocks a member's locked login)
+      { h: '', f: r => rowBtns('member', r.id, `<button class="btn small" data-act="resetLogin" data-id="${r.id}" data-name="${esc(r.fullName)}">Reset login</button>`) }
     ], rows);
   };
   $('#memberFilter').addEventListener('submit', e => { e.preventDefault(); load().catch(x => toast(x.message, true)); });
@@ -2266,7 +2272,8 @@ const actions = {
   resetLogin(d) {
     modal({
       title: `Reset login · ${d.name}`, submit: 'Reset login',
-      body: `<p class="muted">The member's password goes back to their full names, and the login is switched on.</p>`,
+      body: `<p class="muted">The member's password goes back to their full names, and the login is switched on. ` +
+        `A login locked after 4 wrong passwords is unlocked here by the support login only.</p>`,
       onSubmit: async () => {
         const m = await api(`/api/members/${d.id}/reset-login`, { method: 'POST' });
         toast(`Login reset. Username: ${m.loginUsername}`); route();
