@@ -250,11 +250,20 @@ class SingleBranchTest {
         boolean shownLocked = false;
         for (JsonNode u : send(admin2, "GET", "/api/users", null, 200)) if (u.get("username").asText().equals("cash3")) shownLocked = u.get("locked").asBoolean();
         assertEquals(true, shownLocked);
-        send(admin2, "PUT", "/api/users/" + cash3 + "/password", "{\"password\":\"admin-sets-it\"}", 403);     // not the administrator
-        send(support, "PUT", "/api/users/" + cash3 + "/password", "{\"password\":\"support-sets-1\"}", 200);
+        send(admin2, "PUT", "/api/users/" + cash3 + "/password", "{\"password\":\"admin-sets-it\"}", 200);     // the administrator unlocks it
+        send(httpBasic("cash3", "admin-sets-it"), "GET", "/api/me", null, 200);
+        for (int i = 0; i < 4; i++) send(httpBasic("cash3", "not-it"), "GET", "/api/me", null, 401);          // locked again
+        send(support, "PUT", "/api/users/" + cash3 + "/password", "{\"password\":\"support-sets-1\"}", 200);     // support unlocks it too
         send(httpBasic("cash3", "support-sets-1"), "GET", "/api/me", null, 200);
         boolean lockAudited = false;
         for (JsonNode a : send(admin2, "GET", "/api/audit", null, 200)) lockAudited |= a.get("action").asText().equals("LOCK");
         assertEquals(true, lockAudited);
+
+        // a locked administrator cannot unlock themselves (they cannot sign in): the support login does it
+        long adminId = send(admin2, "GET", "/api/me", null, 200).get("id").asLong();
+        for (int i = 0; i < 4; i++) send(httpBasic("admin", "not-it"), "GET", "/api/me", null, 401);
+        send(admin2, "GET", "/api/me", null, 401);
+        send(support, "PUT", "/api/users/" + adminId + "/password", "{\"password\":\"admin-again-1\"}", 200);
+        send(httpBasic("admin", "admin-again-1"), "GET", "/api/me", null, 200);
     }
 }

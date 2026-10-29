@@ -17,8 +17,9 @@ import java.time.Instant;
 
 /**
  * Stops password guessing. Every wrong password for a login is counted; a right one sets the count back to 0. At MAX_TRIES wrong
- * passwords in a row the login is locked: even the right password is refused until the support login resets the password. The
- * support login has nobody above it to unlock it, so its lock ends by itself after SUPPORT_LOCK. Locks are kept in the audit trail.
+ * passwords in a row the login is locked: even the right password is refused until its password is reset by whoever manages it
+ * (the branch admin for treasurers, cashiers and members; the support login for anyone). The support login has nobody above it
+ * to unlock it, so its lock ends by itself after SUPPORT_LOCK. Locks are kept in the audit trail.
  */
 @Component
 @RequiredArgsConstructor
@@ -45,7 +46,8 @@ public class LoginGuard {
                 u.setLockedAt(Instant.now());
                 log.warn("Login '{}' locked after {} wrong passwords in a row", u.getUsername(), u.getFailedLogins());
                 audit.logSystem(u.getBranch(), "LOCK", "Login", u.getId(), "Login " + u.getUsername() + " locked after " + MAX_TRIES
-                        + " wrong passwords" + (u.getRole() == Role.MANAGER ? " (opens again after 30 minutes)" : " (the support login unlocks it)"));
+                        + " wrong passwords" + (u.getRole() == Role.MANAGER ? " (opens again after 30 minutes)"
+                        : u.getRole() == Role.BRANCH_ADMIN ? " (the support login unlocks it)" : " (the branch admin or the support login unlocks it)"));
             }
             users.save(u);
         });

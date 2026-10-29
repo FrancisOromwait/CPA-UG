@@ -575,12 +575,12 @@ views.admins = async el => {
           (r.locked ? ' <span class="badge out" title="Locked after 4 wrong passwords">Locked</span>' : '') },
       { h: '', f: r => (isMgr() || ['TREASURER', 'CASHIER'].includes(r.role)) ? `<div class="actions">` +
           (r.id === S.me.id ? '' : `<button class="btn small" data-act="toggleUser" data-id="${r.id}" data-value="${!r.enabled}">${r.enabled ? 'Disable' : 'Enable'}</button>`) +
-          // a locked login is unlocked by the support login only, with a new password
-          (r.locked && !isMgr() ? '<span class="muted">Locked: the support login unlocks it</span>'
-            : `<button class="btn small${r.locked ? ' primary' : ''}" data-act="resetPassword" data-id="${r.id}" data-name="${esc(r.username)}">` +
-              `${r.locked ? 'Unlock &amp; reset password' : 'Reset password'}</button>`) + `</div>` : '' }
+          // a locked login is unlocked by giving it a new password (whoever manages the login may do that)
+          `<button class="btn small${r.locked ? ' primary' : ''}" data-act="resetPassword" data-id="${r.id}" data-name="${esc(r.username)}">` +
+          `${r.locked ? 'Unlock &amp; reset password' : 'Reset password'}</button>` + `</div>` : '' }
     ], list) + (list.some(r => r.locked)
-      ? `<p class="muted" style="margin:10px 0 0">A login is locked after 4 wrong passwords in a row. ${isMgr() ? 'Unlock it by giving it a new password.' : 'Ask the support login to unlock it.'}</p>` : '') + '</div>';
+      ? `<p class="muted" style="margin:10px 0 0">A login is locked after 4 wrong passwords in a row. Unlock it by giving it a new password` +
+        `${isMgr() ? '' : ' (a locked administrator is unlocked by the support login)'}.</p>` : '') + '</div>';
 };
 views.staff = views.admins;
 
@@ -606,7 +606,7 @@ views.members = async el => {
       { h: 'Phone', f: r => esc(r.phone || '') },
       { h: 'Employer', f: r => esc(r.employer || '') },
       { h: 'Payroll no.', f: r => esc(r.payrollNo || '') },
-      // Reset login is for staff and for the support login (which alone unlocks a member's locked login)
+      // Reset login is for staff and for the support login (a locked member login: the administrator or support)
       { h: '', f: r => rowBtns('member', r.id, `<button class="btn small" data-act="resetLogin" data-id="${r.id}" data-name="${esc(r.fullName)}">Reset login</button>`) }
     ], rows);
   };
@@ -2273,7 +2273,7 @@ const actions = {
     modal({
       title: `Reset login · ${d.name}`, submit: 'Reset login',
       body: `<p class="muted">The member's password goes back to their full names, and the login is switched on. ` +
-        `A login locked after 4 wrong passwords is unlocked here by the support login only.</p>`,
+        `A login locked after 4 wrong passwords is unlocked here too (by the administrator or the support login).</p>`,
       onSubmit: async () => {
         const m = await api(`/api/members/${d.id}/reset-login`, { method: 'POST' });
         toast(`Login reset. Username: ${m.loginUsername}`); route();

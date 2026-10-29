@@ -92,13 +92,9 @@ public class UserController {
     @PutMapping("/{id}/password")
     @Transactional
     UserDto resetPassword(@PathVariable Long id, @Valid @RequestBody PasswordReq req) {
+        // whoever may manage this login may also unlock it: the support login anyone, a branch admin their treasurers and cashiers
         AppUser u = manageable(id);
-        // a login locked after too many wrong passwords is opened again by the support login only
         boolean wasLocked = u.isLocked();
-        if (wasLocked && !scope.isManager()) {
-            throw new ApiException(HttpStatus.FORBIDDEN, "This login is locked after " + LoginGuard.MAX_TRIES
-                    + " wrong passwords. Only the support login can unlock it by resetting the password.");
-        }
         u.setPasswordHash(encoder.encode(req.password()));
         LoginGuard.clear(u);
         audit(u, wasLocked ? "Unlocked and reset the password of " : "Reset the password of ");

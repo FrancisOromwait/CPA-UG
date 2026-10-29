@@ -56,8 +56,8 @@ public class SecurityConfig {
                 res.setStatus(401);
                 res.setContentType("application/json");
                 res.getWriter().write(ex instanceof LockedException
-                        ? "{\"error\":\"This login is locked after " + LoginGuard.MAX_TRIES + " wrong passwords. Ask the support login to reset the password."
-                          + " (The support login itself opens again after 30 minutes.)\"}"
+                        ? "{\"error\":\"This login is locked after " + LoginGuard.MAX_TRIES + " wrong passwords. Ask the administrator to reset the password"
+                          + " (an administrator's own login: ask the support login). The support login itself opens again after 30 minutes.\"}"
                         : "{\"error\":\"Invalid username or password\"}");
             }))
             .authorizeHttpRequests(a -> a
