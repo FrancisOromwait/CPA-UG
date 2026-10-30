@@ -6,6 +6,8 @@ public enum TxType {
     MEMBERSHIP_FEE, MEMBERSHIP_REFUND,
     /** Monthly interest earned on savings, owed to the member until it is paid out. */
     SAVINGS_INTEREST,
+    /** Savings interest taken back: a savings entry made late with an earlier date, or deleted, had earned less than was booked. */
+    SAVINGS_INTEREST_REVERSAL,
     /** The accrued savings interest paid into the member's savings (year end): the interest account goes down, savings go up. */
     SAVINGS_INTEREST_PAYOUT,
     /** Savings interest paid out in the old system: only the interest side came over, its savings side is a deposit of its own. Not posted again. */

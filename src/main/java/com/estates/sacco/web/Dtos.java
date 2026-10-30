@@ -40,15 +40,17 @@ public final class Dtos {
                             String employer, String payrollNo) {}
 
     public record MemberDto(Long id, Long branchId, String branchCode, String memberNo, String fullName, String phone,
-                            String employer, String payrollNo, boolean active, String loginUsername) {
+                            String employer, String payrollNo, boolean active, String loginUsername,
+                            /** Savings interest is booked up to and including this day (empty: not yet, it starts with the first month). */
+                            java.time.LocalDate lastSavingsDate) {
         public static MemberDto of(Member m) {
             return new MemberDto(m.getId(), m.getBranch().getId(), m.getBranch().getCode(), m.getMemberNo(),
-                    m.getFullName(), m.getPhone(), m.getEmployer(), m.getPayrollNo(), m.isActive(), null);
+                    m.getFullName(), m.getPhone(), m.getEmployer(), m.getPayrollNo(), m.isActive(), null, m.getLastSavingsDate());
         }
 
         /** The same member, with the username of their login (shown when they are added or their login is reset). */
         public MemberDto withLogin(String username) {
-            return new MemberDto(id, branchId, branchCode, memberNo, fullName, phone, employer, payrollNo, active, username);
+            return new MemberDto(id, branchId, branchCode, memberNo, fullName, phone, employer, payrollNo, active, username, lastSavingsDate);
         }
     }
 

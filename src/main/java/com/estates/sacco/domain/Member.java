@@ -33,4 +33,9 @@ public class Member {
 
     private LocalDate joinedOn = LocalDate.now();
     private boolean active = true;
+    /**
+     * Savings interest is booked up to and including this day (SavingsAccrualService): each savings entry books the days since
+     * then on the balance before it, and month end books the rest of the month. Empty: nothing booked here yet.
+     */
+    private LocalDate lastSavingsDate;
 }

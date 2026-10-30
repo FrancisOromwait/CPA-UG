@@ -12,6 +12,7 @@ import org.springframework.transaction.annotation.Transactional;
 import java.math.BigDecimal;
 import java.math.RoundingMode;
 import java.time.LocalDate;
+import java.util.ArrayList;
 import java.util.LinkedHashMap;
 import java.util.List;
 import java.util.Map;
@@ -64,6 +65,9 @@ public class EntryAdminService {
         if (e.getType() == TxType.LOAN_INTEREST_REVERSAL) {
             return "A one-off correction made when the loan moved to monthly interest. It cannot be changed here.";
         }
+        if (e.getType() == TxType.SAVINGS_INTEREST || e.getType() == TxType.SAVINGS_INTEREST_REVERSAL || e.getType() == TxType.SAVINGS_INTEREST_PAYOUT) {
+            return "Savings interest is booked by the system from the member's savings. Change the savings entry and the interest follows.";
+        }
         return null;
     }
 
@@ -97,6 +101,9 @@ public class EntryAdminService {
 
         // a part of a regular deposit: date, receipt, notes and receiving account belong to the whole deposit
         List<LedgerEntry> parts = e.getDepositGroup() == null ? List.of(e) : ledger.findByDepositGroupOrderByIdAsc(e.getDepositGroup());
+        // savings interest follows the change: what was there is taken away, what is there now is added (the same nets to nothing)
+        List<SavingsAccrualService.Change> changes = new ArrayList<>();
+        for (LedgerEntry p : parts) changes.add(taken(p));
         for (LedgerEntry p : parts) removeLines(p);
         for (LedgerEntry p : parts) {
             if (p.getId().equals(e.getId())) {
@@ -113,7 +120,11 @@ public class EntryAdminService {
             }
             ledger.save(p);
         }
-        for (LedgerEntry p : parts) posting.record(p);
+        for (LedgerEntry p : parts) {
+            posting.recordLines(p);
+            changes.add(SavingsAccrualService.changeOf(p));
+        }
+        posting.savingsChanged(changes);
         for (LedgerEntry p : parts) if (p.getLoan() != null) schedules.reallocate(p.getLoan());
         checkIntegrity(e.getMember(), e.getLoan());
         audit.log(e.getBranch(), "EDIT", "Transaction", e.getId(), "Was: " + before + " | Now: " + describe(e));
@@ -186,14 +197,18 @@ public class EntryAdminService {
         batch.setPaymentDate(day);
         batch.setReceivingAccount(receiving);
         String ref = "PAYROLL " + period + " " + batch.getEmployer();
+        List<SavingsAccrualService.Change> changes = new ArrayList<>();
         for (LedgerEntry e : ledger.findByPayrollBatchId(batch.getId())) {
+            changes.add(taken(e));
             removeLines(e);
             e.setReference(ref);
             if (day != null) e.setPostedOn(day);
             e.setReceivingAccount(receiving);
             ledger.save(e);
-            posting.record(e);
+            posting.recordLines(e);
+            changes.add(SavingsAccrualService.changeOf(e));
         }
+        posting.savingsChanged(changes);   // a new payment date moves the savings interest of every deposit in the batch
         batches.save(batch);
         audit.log(batch.getBranch(), "EDIT", "Payroll batch", batch.getId(), "Was: " + before + " | Now: " + describe(batch));
         return batch;
@@ -220,9 +235,17 @@ public class EntryAdminService {
     // ------------------------------------------------------------------ helpers
     /** Removes a transaction together with its ledger lines. */
     private void remove(LedgerEntry e) {
+        SavingsAccrualService.Change gone = taken(e);
         removeLines(e);
         ledger.delete(e);
         ledger.flush();
+        if (gone != null) posting.savingsChanged(List.of(gone));   // interest it had earned is taken back
+    }
+
+    /** What taking an entry away does to the member's savings (null: it does not touch savings). */
+    private static SavingsAccrualService.Change taken(LedgerEntry e) {
+        SavingsAccrualService.Change c = SavingsAccrualService.changeOf(e);
+        return c == null ? null : c.negate();
     }
 
     private void removeLines(LedgerEntry e) {

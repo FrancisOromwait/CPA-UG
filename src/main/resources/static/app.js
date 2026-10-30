@@ -632,7 +632,7 @@ views.statement = async (el, id) => {
     `<p><a href="#members">← Back to members</a></p>` +
     `<div class="panel"><div class="member-head"><div class="photo-box" id="photoBox"></div><div class="grow">` +
     `<h3>${esc(m.fullName)} <span class="muted">· ${esc(m.memberNo)}${S.single ? '' : ' · ' + esc(m.branchCode)}</span></h3>` +
-    `<div class="kv"><div><span>Phone</span>${esc(m.phone || '—')}</div><div><span>Employer</span>${esc(m.employer || '—')}</div><div><span>Payroll no.</span>${esc(m.payrollNo || '—')}</div></div></div></div></div>` +
+    `<div class="kv"><div><span>Phone</span>${esc(m.phone || '—')}</div><div><span>Employer</span>${esc(m.employer || '—')}</div><div><span>Payroll no.</span>${esc(m.payrollNo || '—')}</div><div><span>Last savings date</span>${esc(m.lastSavingsDate || '—')}</div></div></div></div></div>` +
     `<div class="cards">${stat('', 'Savings balance', money(s.savingsBalance))}${stat('b2', 'Shares balance', money(s.sharesBalance))}` +
     `${stat('b3', 'Loan outstanding', money(s.loans.reduce((a, l) => a + Number(l.outstanding), 0)))}</div>` +
     `<div class="panel"><h3>Loans</h3>${loanTable(s.loans, false)}</div>` +
@@ -1656,8 +1656,10 @@ views.savingsinterest = async el => {
   el.innerHTML = `<div class="panel"><h3>Interest on savings</h3>` +
     (info.enabled
       ? `<p class="muted" style="margin-top:0">Savings earn <strong>${esc(info.ratePercent)}% a year</strong>, worked out every day on the member's balance (the yearly rate ÷ ${esc(info.dayBasis)}). ` +
-        `Money counts from the day after it is paid in and stops the day after it is taken out. The interest of a month is booked <strong>by itself</strong> ` +
-        `once the month has ended (starting with ${esc(info.firstMonth)}) and is kept as owed to the member. At year end you pay it into their savings below.</p>`
+        `Money counts from the day after it is paid in and stops the day after it is taken out. The interest is booked <strong>by itself</strong> as the savings move ` +
+        `(starting with ${esc(info.firstMonth)}): every deposit or withdrawal books the days since the member's <strong>last savings date</strong> on the balance before it ` +
+        `(a deposit on the 13th books 13 − 0 days, one on the 20th 20 − 13 days), and once the month has ended the month end books the rest (31 − 20 days). ` +
+        `An entry made late with an earlier date books, or takes back, the difference. The interest is kept as owed to the member; at year end you pay it into their savings below.</p>`
       : `<p class="muted">Savings interest is not switched on.</p>`) + `</div>` +
     `<div class="panel"><form class="toolbar" id="svFilter">` + inp('month', 'Month', { type: 'month', req: 1, value: defaultMonth }) +
     `<button class="btn primary">View interest</button></form><div id="svOut"></div></div>` +
@@ -1668,7 +1670,7 @@ views.savingsinterest = async el => {
   const loadRuns = async () => {
     const rows = await api('/api/savings-interest/runs');
     $('#svRuns').innerHTML = table([
-      { h: 'What', f: r => r.kind === 'PAYOUT' ? 'Paid into savings' : 'Interest earned' },
+      { h: 'What', f: r => r.kind === 'PAYOUT' ? 'Paid into savings' : 'Month end' },
       { h: 'For', f: r => `<strong>${esc(r.period)}</strong>` },
       { h: 'Members', num: 1, f: r => r.memberCount },
       { h: 'Amount', num: 1, f: r => money(r.totalAmount) },
@@ -1689,21 +1691,26 @@ views.savingsinterest = async el => {
     let note = '';
     if (p.booked) note += `<div class="error" style="background:var(--blue-dark)">Interest for ${esc(p.month)} has already been booked.</div>`;
     else if (!p.ended) note += `<div class="error" style="background:var(--blue-dark)">${esc(p.month)} has not ended yet, so this is what the interest would be so far. It is booked after ${esc(p.monthEnd)}.</div>`;
+    const sum = k => p.lines.reduce((s, r) => s + Number(r[k] || 0), 0);
+    const toBook = sum('toBook');
     const canPost = !manager && info.enabled && p.ended && !p.booked && p.lines.length > 0;
     $('#svOut').innerHTML = `<h3>Interest for ${esc(p.month)} <span class="muted">· to ${esc(p.monthEnd)}</span></h3>${note}` +
       (p.lines.length ? table([
         { h: 'Member', f: r => `${esc(r.memberNo)} · ${esc(r.memberName)}` },
         { h: 'Savings at start of month', num: 1, f: r => money(r.openingBalance) },
         { h: 'Average savings in the month', num: 1, f: r => money(r.averageBalance) },
-        { h: 'Interest', num: 1, f: r => `<strong>${money(r.interest)}</strong>` }
-      ], p.lines, `<tfoot><tr><td colspan="3">Total interest for ${p.lines.length} member${p.lines.length === 1 ? '' : 's'}</td><td class="num">${money(p.total)}</td></tr></tfoot>`)
+        { h: 'Interest for the month', num: 1, f: r => `<strong>${money(r.interest)}</strong>` },
+        { h: 'Booked at deposits', num: 1, f: r => money(r.booked) },
+        { h: 'Month end books', num: 1, f: r => money(r.toBook) }
+      ], p.lines, `<tfoot><tr><td colspan="3">Total for ${p.lines.length} member${p.lines.length === 1 ? '' : 's'}</td><td class="num">${money(p.total)}</td>` +
+        `<td class="num">${money(sum('booked'))}</td><td class="num">${money(toBook)}</td></tr></tfoot>`)
         : `<div class="empty">${info.enabled && p.month < info.firstMonth ? `Interest before ${esc(info.firstMonth)} was worked out in the old system.` : 'No savings earned interest in this month.'}</div>`) +
-      (canPost ? `<div class="toolbar" style="margin-top:14px"><button class="btn primary" id="svPost">Book interest · ${money(p.total)}</button>` +
-        `<span class="muted">Dr Savings interest expense, Cr Savings interest payable, and owed to each member.</span></div>` : '');
+      (canPost ? `<div class="toolbar" style="margin-top:14px"><button class="btn primary" id="svPost">Book the month end · ${money(toBook)}</button>` +
+        `<span class="muted">The days from each member's last savings date to ${esc(p.monthEnd)}: Dr Savings interest expense, Cr Savings interest payable.</span></div>` : '');
     const post = $('#svPost');
     if (post) post.onclick = async () => {
       post.disabled = true;
-      try { await api('/api/savings-interest/runs', { method: 'POST', body: { month: p.month } }); toast(`Interest for ${p.month} booked · UGX ${money(p.total)}`); await Promise.all([view(), loadRuns(), viewOwed()]); }
+      try { await api('/api/savings-interest/runs', { method: 'POST', body: { month: p.month } }); toast(`Month end of ${p.month} booked · UGX ${money(toBook)}`); await Promise.all([view(), loadRuns(), viewOwed()]); }
       catch (x) { toast(x.message, true); post.disabled = false; }
     };
   };

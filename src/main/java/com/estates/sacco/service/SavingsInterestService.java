@@ -22,8 +22,9 @@ import java.util.*;
  * year (365) on the balance they have that day. A deposit starts earning the day after it is made and a withdrawal stops the
  * day after, so a deposit on the 13th of a 31-day month earns on the old balance for 13 days and on the new one for the other 18.
  * <p>
- * The month's interest is booked once the month has ended: Dr Savings interest expense, Cr Savings interest payable, and it
- * is kept as owed to the member (their savings interest account). A payout, normally at year end, moves what has built up into the
+ * The interest is booked as the savings move (SavingsAccrualService): each savings entry books the days since the member's last
+ * savings date, and once the month has ended the month end books the days from there to the month end. Each booking is
+ * Dr Savings interest expense, Cr Savings interest payable, and is kept as owed to the member (their savings interest account). A payout, normally at year end, moves what has built up into the
  * member's savings. The old system's interest up to the month before the first month here came over with the member ledgers.
  */
 @Service
@@ -40,6 +41,7 @@ public class SavingsInterestService {
     private final BranchRepository branches;
     private final ProductDefRepository products;
     private final PostingService posting;
+    private final SavingsAccrualService accrual;
     private final AuditService audit;
 
     @Value("${sacco.savings-interest.rate:8}")
@@ -79,7 +81,12 @@ public class SavingsInterestService {
     }
 
     // ------------------------------------------------------------------ one month
-    public record Line(Long memberId, String memberNo, String memberName, BigDecimal openingBalance, BigDecimal averageBalance, BigDecimal interest) {}
+    /**
+     * One member's month: the interest the whole month earns, what savings entries have booked of it already (with any adjustments
+     * dated in the month), and what the month end still books: the days from the member's last savings date to the month end.
+     */
+    public record Line(Long memberId, String memberNo, String memberName, BigDecimal openingBalance, BigDecimal averageBalance, BigDecimal interest,
+                       BigDecimal booked, BigDecimal toBook) {}
 
     public static YearMonth parse(String month) {
         try {
@@ -110,29 +117,46 @@ public class SavingsInterestService {
     }
 
     private static String reference(YearMonth month) {
-        return "Savings interest " + month;
+        return "Month end " + month;
     }
 
     private static String payoutReference(LocalDate date) {
         return "Savings interest paid " + date;
     }
 
-    /** What every member's savings would earn in the month, nothing saved. */
+    /** Every member's savings moves of a branch up to a date. */
+    private Map<Long, List<Move>> movesByMember(Long branchId, LocalDate to) {
+        Map<Long, List<Move>> byMember = new HashMap<>();
+        for (Object[] r : memberLedger.savingsMoves(branchId, to)) {
+            byMember.computeIfAbsent((Long) r[0], k -> new ArrayList<>()).add(new Move((LocalDate) r[1], (BigDecimal) r[2]));
+        }
+        return byMember;
+    }
+
+    /** The month's interest per member: earned, booked already by savings entries, and left for the month end. Nothing saved. */
     @Transactional(readOnly = true)
     public List<Line> preview(Long branchId, YearMonth month) {
         if (enabled() && month.isBefore(first())) return List.of();
-        Map<Long, List<Move>> byMember = new HashMap<>();
-        for (Object[] r : memberLedger.savingsMoves(branchId, month.atEndOfMonth())) {
-            byMember.computeIfAbsent((Long) r[0], k -> new ArrayList<>()).add(new Move((LocalDate) r[1], (BigDecimal) r[2]));
-        }
+        LocalDate end = month.atEndOfMonth();
+        Map<Long, List<Move>> byMember = movesByMember(branchId, end);
+        Map<Long, BigDecimal> booked = new HashMap<>();
+        for (Object[] r : memberLedger.savingsInterestBooked(branchId, month.atDay(1), end)) booked.put((Long) r[0], (BigDecimal) r[1]);
+        Set<Long> ids = new HashSet<>(byMember.keySet());
+        ids.addAll(booked.keySet());
         Map<Long, Member> byId = new HashMap<>();
-        members.findAllById(byMember.keySet()).forEach(m -> byId.put(m.getId(), m));
+        members.findAllById(ids).forEach(m -> byId.put(m.getId(), m));
+        boolean closed = runs.existsByBranchIdAndKindAndPeriod(branchId, SavingsInterestRun.ACCRUAL, month.toString());
         List<Line> out = new ArrayList<>();
-        for (var e : byMember.entrySet()) {
-            Result r = interestFor(e.getValue(), month, ratePercent, dayBasis);
-            if (r.interest().signum() <= 0) continue;
-            Member m = byId.get(e.getKey());
-            out.add(new Line(m.getId(), m.getMemberNo(), m.getFullName(), r.openingBalance(), r.averageBalance(), r.interest()));
+        for (Long id : ids) {
+            List<Move> moves = byMember.getOrDefault(id, List.of());
+            Result r = interestFor(moves, month, ratePercent, dayBasis);
+            Member m = byId.get(id);
+            BigDecimal already = booked.getOrDefault(id, BigDecimal.ZERO);
+            LocalDate last = accrual.lastDateOf(m);
+            BigDecimal toBook = closed || !last.isBefore(end) ? BigDecimal.ZERO
+                    : SavingsAccrualService.interestBetween(moves, last.plusDays(1), end, ratePercent, dayBasis)[0].setScale(0, RoundingMode.HALF_UP);
+            if (r.interest().signum() <= 0 && already.signum() == 0 && toBook.signum() <= 0) continue;
+            out.add(new Line(m.getId(), m.getMemberNo(), m.getFullName(), r.openingBalance(), r.averageBalance(), r.interest(), already, toBook));
         }
         out.sort(Comparator.comparing(Line::memberNo));
         return out;
@@ -156,10 +180,15 @@ public class SavingsInterestService {
         if (runs.existsByBranchIdAndKindAndPeriod(branchId, SavingsInterestRun.ACCRUAL, month.toString())) {
             throw new ApiException(HttpStatus.CONFLICT, "Savings interest for " + month + " has already been booked");
         }
+        YearMonth before = month.minusMonths(1);
+        if (!before.isBefore(first()) && !runs.existsByBranchIdAndKindAndPeriod(branchId, SavingsInterestRun.ACCRUAL, before.toString())) {
+            throw new ApiException(HttpStatus.BAD_REQUEST, "Book the month end of " + before + " first");
+        }
         Branch branch = branches.findById(branchId).orElseThrow();
-        ProductDef product = interestProduct(branchId);
-        List<Line> lines = preview(branchId, month);
-        if (lines.isEmpty()) throw new ApiException(HttpStatus.BAD_REQUEST, "No savings earned interest in " + month);
+        interestProduct(branchId);
+        LocalDate end = month.atEndOfMonth();
+        Map<Long, List<Move>> byMember = movesByMember(branchId, end);
+        if (byMember.isEmpty()) throw new ApiException(HttpStatus.BAD_REQUEST, "No member has savings in " + month);
 
         SavingsInterestRun run = new SavingsInterestRun();
         run.setBranch(branch);
@@ -170,27 +199,24 @@ public class SavingsInterestService {
         run.setRatePercent(ratePercent);
         run.setReference(reference(month));
         run.setCreatedBy(user == null ? "system" : user);
+        // each member: the days from their last savings date to the month end (savings entries booked the days before)
         BigDecimal total = BigDecimal.ZERO;
-        for (Line l : lines) {
-            LedgerEntry e = new LedgerEntry();
-            e.setBranch(branch);
-            e.setMember(members.getReferenceById(l.memberId()));
-            e.setProduct(product);
-            e.setType(TxType.SAVINGS_INTEREST);
-            e.setSource(Source.SYSTEM);
-            e.setAmount(l.interest());
-            e.setPostedOn(month.atEndOfMonth());
-            e.setReference(run.getReference());
-            e.setNotes("Average balance " + l.averageBalance().toPlainString() + " at " + ratePercent.stripTrailingZeros().toPlainString() + "% a year");
-            e.setCreatedBy(run.getCreatedBy());
-            ledger.save(e);
-            posting.record(e);
-            total = total.add(l.interest());
+        int count = 0;
+        for (Member m : members.findAllById(byMember.keySet())) {
+            LocalDate last = accrual.lastDateOf(m);
+            if (!last.isBefore(end)) continue;
+            Optional<LedgerEntry> e = accrual.accrue(m, branch, byMember.get(m.getId()), last, end, run.getReference(), run.getCreatedBy());
+            m.setLastSavingsDate(end);
+            members.save(m);
+            if (e.isEmpty()) continue;
+            posting.recordLines(e.get());
+            total = total.add(e.get().getAmount());
+            count++;
         }
         run.setTotalAmount(total);
-        run.setMemberCount(lines.size());
+        run.setMemberCount(count);
         runs.save(run);
-        log("Booked savings interest for " + month + ": " + total + " for " + lines.size() + " members", branch, run, user);
+        log("Booked the month end of savings interest for " + month + ": " + total + " for " + count + " members", branch, run, user);
         return run;
     }
 
@@ -222,6 +248,16 @@ public class SavingsInterestService {
         }
         Branch branch = branches.findById(branchId).orElseThrow();
         ProductDef product = interestProduct(branchId);
+        String by = user == null ? "system" : user;
+        // first the interest up to the day of payment, so what is paid is everything earned up to then
+        Map<Long, List<Move>> byMember = movesByMember(branchId, date);
+        for (Member m : members.findAllById(byMember.keySet())) {
+            LocalDate last = accrual.lastDateOf(m);
+            if (!last.isBefore(date)) continue;
+            accrual.accrue(m, branch, byMember.get(m.getId()), last, date, null, by).ifPresent(posting::recordLines);
+            m.setLastSavingsDate(date);
+            members.save(m);
+        }
         List<Owed> owed = owed(branchId, date);
         if (owed.isEmpty()) throw new ApiException(HttpStatus.BAD_REQUEST, "No member is owed savings interest on " + date);
 
@@ -266,13 +302,37 @@ public class SavingsInterestService {
         if (!latest.getId().equals(run.getId())) {
             throw new ApiException(HttpStatus.CONFLICT, "Only the latest run (" + latest.getKind().toLowerCase() + " " + latest.getPeriod() + ") can be deleted");
         }
-        TxType type = SavingsInterestRun.ACCRUAL.equals(run.getKind()) ? TxType.SAVINGS_INTEREST : TxType.SAVINGS_INTEREST_PAYOUT;
+        boolean monthEnd = SavingsInterestRun.ACCRUAL.equals(run.getKind());
+        LocalDate end = run.getPeriodEnd();
+        List<Member> inBranch = members.findAll().stream().filter(m -> m.getBranch() != null && m.getBranch().getId().equals(branchId)).toList();
+        if (monthEnd && inBranch.stream().anyMatch(m -> m.getLastSavingsDate() != null && m.getLastSavingsDate().isAfter(end))) {
+            throw new ApiException(HttpStatus.CONFLICT, "Savings entries dated after " + end + " have already booked interest past this month end, so it can no longer be deleted");
+        }
+        TxType type = monthEnd ? TxType.SAVINGS_INTEREST : TxType.SAVINGS_INTEREST_PAYOUT;
+        List<SavingsAccrualService.Change> taken = new ArrayList<>();
         for (LedgerEntry e : ledger.findByBranchIdAndTypeAndReference(branchId, type, run.getReference())) {
+            SavingsAccrualService.Change c = SavingsAccrualService.changeOf(e);
+            if (c != null) taken.add(c.negate());
             generalLedger.deleteByLedgerEntryId(e.getId());
             memberLedger.deleteByLedgerEntryId(e.getId());
             ledger.delete(e);
         }
         ledger.flush();
+        if (monthEnd) {
+            // back to where each member stood before the month end: the later of the month before's end and their last savings entry in it
+            YearMonth month = YearMonth.from(end);
+            LocalDate before = month.atDay(1).minusDays(1).isBefore(accrual.start()) ? accrual.start() : month.atDay(1).minusDays(1);
+            Map<Long, LocalDate> lastIn = new HashMap<>();
+            for (Object[] r : memberLedger.lastSavingsDates(branchId, month.atDay(1), end)) lastIn.put((Long) r[0], (LocalDate) r[1]);
+            for (Member m : inBranch) {
+                if (!end.equals(m.getLastSavingsDate())) continue;
+                LocalDate d = lastIn.get(m.getId());
+                m.setLastSavingsDate(d != null && d.isAfter(before) ? d : before);
+                members.save(m);
+            }
+        } else {
+            posting.savingsChanged(taken);   // the paid-in interest no longer earns interest of its own
+        }
         runs.delete(run);
         log("Deleted the " + run.getKind().toLowerCase() + " " + run.getPeriod() + " of " + run.getTotalAmount(), run.getBranch(), run, user);
     }

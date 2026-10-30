@@ -41,6 +41,7 @@ public class PostingService {
     private final GeneralLedgerRepository generalLedger;
     private final LedgerRepository ledger;
     private final LoanScheduleService schedules;
+    private final SavingsAccrualService savingsAccrual;
 
     private final AccountCodes codes;
 
@@ -49,13 +50,30 @@ public class PostingService {
             case SAVINGS_DEPOSIT, SAVINGS_WITHDRAWAL -> ProductCategory.SAVINGS;
             case SHARE_PURCHASE, SHARE_REFUND -> ProductCategory.SHARES;
             case MEMBERSHIP_FEE, MEMBERSHIP_REFUND -> ProductCategory.MEMBERSHIP;
-            case SAVINGS_INTEREST, SAVINGS_INTEREST_PAYOUT, SAVINGS_INTEREST_SETTLED -> ProductCategory.SAVINGS_INTEREST;
+            case SAVINGS_INTEREST, SAVINGS_INTEREST_REVERSAL, SAVINGS_INTEREST_PAYOUT, SAVINGS_INTEREST_SETTLED -> ProductCategory.SAVINGS_INTEREST;
             case LOAN_DISBURSEMENT, LOAN_REPAYMENT, LOAN_INTEREST, LOAN_INTEREST_REVERSAL, LOAN_INTEREST_PAID -> ProductCategory.LOAN;
         };
     }
 
+    /** Posts an entry; one that moves a member's savings also books the savings interest it calls for (SavingsAccrualService). */
     @Transactional
     public void record(LedgerEntry e) {
+        recordLines(e);
+        savingsChanged(java.util.Collections.singletonList(SavingsAccrualService.changeOf(e)));
+    }
+
+    /**
+     * Books the savings interest that changes to members' savings call for, with its ledger lines. Used directly where entries are
+     * taken away or edited: the ledger lines are changed first, then the changes (what was there taken away, what is there now) come here.
+     */
+    @Transactional
+    public void savingsChanged(List<SavingsAccrualService.Change> changes) {
+        for (LedgerEntry interest : savingsAccrual.apply(changes)) recordLines(interest);
+    }
+
+    /** Writes an entry's member-ledger and general-ledger lines, and nothing else. */
+    @Transactional
+    public void recordLines(LedgerEntry e) {
         Branch branch = e.getBranch();
         ProductCategory cat = categoryOf(e.getType());
         // the product chosen on the transaction, otherwise the branch default for the category (oldest active)
@@ -72,7 +90,7 @@ public class PostingService {
         // interest postings move no money, so there is no cash-side account
         // a repayment made by the system (a loan cleared by a top-up) moves no cash either
         boolean noCash = e.getType() == TxType.LOAN_INTEREST || e.getType() == TxType.LOAN_INTEREST_REVERSAL || e.getType() == TxType.LOAN_INTEREST_PAID
-                || e.getType() == TxType.SAVINGS_INTEREST || e.getType() == TxType.SAVINGS_INTEREST_PAYOUT || e.getType() == TxType.SAVINGS_INTEREST_SETTLED
+                || e.getType() == TxType.SAVINGS_INTEREST || e.getType() == TxType.SAVINGS_INTEREST_REVERSAL || e.getType() == TxType.SAVINGS_INTEREST_PAYOUT || e.getType() == TxType.SAVINGS_INTEREST_SETTLED
                 || (e.getType() == TxType.LOAN_REPAYMENT && e.getSource() == Source.SYSTEM);
         Account cash = noCash ? null : cashAccount(e);
         // parts of one regular deposit: the receiving account is debited once for the total (refreshGroupCash)
@@ -142,6 +160,14 @@ public class PostingService {
                 gl(e, expense, product, desc, amt, BigDecimal.ZERO);
                 gl(e, productAccount, product, desc, BigDecimal.ZERO, amt);
                 ml(e, product, desc, BigDecimal.ZERO, amt);
+            }
+            case SAVINGS_INTEREST_REVERSAL -> {
+                // interest booked earlier that was not earned: back out of what is owed to the member and out of the expense
+                Account expense = usable(accounts.findByCode(codes.getSavingsInterestExpense())
+                        .orElseThrow(() -> unprocessable("Chart of accounts has no account " + codes.getSavingsInterestExpense() + " (Savings Interest Expense)")));
+                gl(e, productAccount, product, desc, amt, BigDecimal.ZERO);
+                gl(e, expense, product, desc, BigDecimal.ZERO, amt);
+                ml(e, product, desc, amt, BigDecimal.ZERO);
             }
             case SAVINGS_INTEREST_PAYOUT -> {
                 // what the sacco owed the member becomes part of their savings
@@ -228,7 +254,7 @@ public class PostingService {
             p.setDepositGroup(group);
             ledger.save(p);
         }
-        for (LedgerEntry p : parts) record(p);
+        for (LedgerEntry p : parts) recordLines(p);   // the same money on the same days: no interest changes
     }
 
     private ProductDef interestProductOf(ProductDef loanProduct) {

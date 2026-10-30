@@ -24,6 +24,32 @@ public interface MemberLedgerRepository extends JpaRepository<MemberLedgerLine, 
         """)
     List<Object[]> savingsMoves(Long branchId, java.time.LocalDate to);
 
+    /** Rows of [date, credit minus debit] of one member's savings lines up to a date: what a savings entry's interest is worked out on. */
+    @org.springframework.data.jpa.repository.Query("""
+        select m.postedOn, m.credit - m.debit from MemberLedgerLine m
+        where m.member.id = :memberId and m.category = com.estates.sacco.domain.ProductCategory.SAVINGS and m.postedOn <= :to
+        order by m.postedOn, m.id
+        """)
+    List<Object[]> savingsMovesOf(Long memberId, java.time.LocalDate to);
+
+    /** Rows of [memberId, savings interest booked less taken back] in a period: what a month's preview shows as already booked. */
+    @org.springframework.data.jpa.repository.Query("""
+        select m.member.id, sum(m.credit) - sum(m.debit) from MemberLedgerLine m join m.ledgerEntry le
+        where m.branch.id = :branchId and m.category = com.estates.sacco.domain.ProductCategory.SAVINGS_INTEREST
+        and le.type in (com.estates.sacco.domain.TxType.SAVINGS_INTEREST, com.estates.sacco.domain.TxType.SAVINGS_INTEREST_REVERSAL)
+        and m.postedOn between :from and :to
+        group by m.member.id
+        """)
+    List<Object[]> savingsInterestBooked(Long branchId, java.time.LocalDate from, java.time.LocalDate to);
+
+    /** Rows of [memberId, last savings date] in a period: where a member's booked interest stood before the month end was booked. */
+    @org.springframework.data.jpa.repository.Query("""
+        select m.member.id, max(m.postedOn) from MemberLedgerLine m
+        where m.branch.id = :branchId and m.category = com.estates.sacco.domain.ProductCategory.SAVINGS and m.postedOn between :from and :to
+        group by m.member.id
+        """)
+    List<Object[]> lastSavingsDates(Long branchId, java.time.LocalDate from, java.time.LocalDate to);
+
     /** Rows of [memberId, interest owed] for the members whose accrued savings interest is more than nothing at a date. */
     @org.springframework.data.jpa.repository.Query("""
         select m.member.id, sum(m.credit) - sum(m.debit) from MemberLedgerLine m
