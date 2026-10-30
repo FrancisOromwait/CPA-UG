@@ -31,7 +31,7 @@ public class JournalController {
 
     public record LineReq(Long accountId, String description, BigDecimal debit, BigDecimal credit) {}
 
-    public record JournalReq(LocalDate date, String reference, String narration, @NotEmpty @Valid List<LineReq> lines) {}
+    public record JournalReq(LocalDate date, String reference, String narration, @NotEmpty List<@Valid LineReq> lines) {}
 
     public record LineView(Long accountId, String accountCode, String accountName, String description,
                            BigDecimal debit, BigDecimal credit) {}

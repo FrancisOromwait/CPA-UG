@@ -94,7 +94,7 @@ public final class Dtos {
     public record PayrollReq(@NotBlank String employer,
                              @NotBlank @Pattern(regexp = "\\d{4}-(0[1-9]|1[0-2])", message = "must be yyyy-MM") String period,
                              @NotNull Long receivingAccountId, LocalDate date,
-                             @NotEmpty @Valid List<PayrollLine> lines) {}
+                             @NotEmpty List<@Valid PayrollLine> lines) {}
 
     public record PayrollDto(Long id, Long branchId, String branchCode, String employer, String period,
                              LocalDate paymentDate, Long receivingAccountId, String receivingAccount,
