@@ -59,6 +59,14 @@ public class LedgerEntry {
 
     private String reference;
 
+    /**
+     * For savings interest booked by a savings entry: that entry. Its view shows both as one journal, as the old system did
+     * (deposit, Dr Savings interest expense, Cr Savings interest payable). Emptied if that entry is deleted; the interest stays.
+     */
+    @ManyToOne
+    @JoinColumn(name = "interest_of_id")
+    private LedgerEntry interestOf;
+
     /** Parts of one regular deposit share this key; their bank (receiving account) debit is posted once, as a total. */
     @Column(length = 40)
     private String depositGroup;

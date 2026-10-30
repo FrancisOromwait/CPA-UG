@@ -52,10 +52,13 @@ public class SavingsAccrualService {
     @Value("${sacco.savings-interest.first-month:}")
     private String firstMonth;
 
-    /** A change to a member's savings on a day: an entry posted (positive for money in) or taken away (the opposite). */
-    public record Change(Member member, Branch branch, LocalDate date, BigDecimal net, String user) {
+    /**
+     * A change to a member's savings on a day: an entry posted (positive for money in) or taken away (the opposite). {@code cause}
+     * is the entry as it stands now (null when it is being taken away): the interest it books is tied to it.
+     */
+    public record Change(Member member, Branch branch, LocalDate date, BigDecimal net, String user, LedgerEntry cause) {
         public Change negate() {
-            return new Change(member, branch, date, net.negate(), user);
+            return new Change(member, branch, date, net.negate(), user, null);
         }
     }
 
@@ -71,7 +74,7 @@ public class SavingsAccrualService {
     /** The change an entry makes to savings as it stands now (null: it does not touch savings). */
     public static Change changeOf(LedgerEntry e) {
         BigDecimal net = savingsNet(e);
-        return net.signum() == 0 || e.getMember() == null ? null : new Change(e.getMember(), e.getBranch(), e.getPostedOn(), net, e.getCreatedBy());
+        return net.signum() == 0 || e.getMember() == null ? null : new Change(e.getMember(), e.getBranch(), e.getPostedOn(), net, e.getCreatedBy(), e);
     }
 
     public boolean enabled() {
@@ -99,7 +102,7 @@ public class SavingsAccrualService {
         for (Change c : changes) {
             if (c == null) continue;
             netted.merge(List.of(c.member().getId(), c.date()), c,
-                    (a, b) -> new Change(a.member(), a.branch(), a.date(), a.net().add(b.net()), a.user()));
+                    (a, b) -> new Change(a.member(), a.branch(), a.date(), a.net().add(b.net()), a.user(), a.cause() != null ? a.cause() : b.cause()));
         }
         netted.values().stream().filter(c -> c.net().signum() != 0).sorted(Comparator.comparing(Change::date))
                 .forEach(c -> one(c, out));
@@ -111,7 +114,7 @@ public class SavingsAccrualService {
         LocalDate last = lastDateOf(m);
         if (c.date().isAfter(last)) {
             if (c.date().isAfter(LocalDate.now())) return;   // a future date: booked when its day has come
-            accrue(m, c.branch(), last, c.date(), null, c.user()).ifPresent(out::add);
+            accrue(m, c.branch(), last, c.date(), null, c.user()).ifPresent(e -> out.add(tie(e, c)));
             m.setLastSavingsDate(c.date());
             members.save(m);
             return;
@@ -123,8 +126,14 @@ public class SavingsAccrualService {
         if (amount.signum() == 0) return;
         String what = (c.net().signum() > 0 ? "Money in " : "Money out ") + c.net().abs().toPlainString() + " dated " + c.date()
                 + ": " + days + " days to " + last;
-        out.add(entry(m, c.branch(), amount.signum() > 0 ? TxType.SAVINGS_INTEREST : TxType.SAVINGS_INTEREST_REVERSAL, amount.abs(), last,
-                "Adjustment for " + c.date(), what, c.user()));
+        out.add(tie(entry(m, c.branch(), amount.signum() > 0 ? TxType.SAVINGS_INTEREST : TxType.SAVINGS_INTEREST_REVERSAL, amount.abs(), last,
+                "Adjustment for " + c.date(), what, c.user()), c));
+    }
+
+    /** Ties the interest to the savings entry that booked it, so the entry shows both as one journal. */
+    private static LedgerEntry tie(LedgerEntry interest, Change c) {
+        if (c.cause() != null && c.cause().getId() != null) interest.setInterestOf(c.cause());
+        return interest;
     }
 
     /**

@@ -315,6 +315,7 @@ public class SavingsInterestService {
             if (c != null) taken.add(c.negate());
             generalLedger.deleteByLedgerEntryId(e.getId());
             memberLedger.deleteByLedgerEntryId(e.getId());
+            ledger.unlinkInterest(e.getId());
             ledger.delete(e);
         }
         ledger.flush();

@@ -90,9 +90,22 @@ class SavingsAccrualTest {
         assertMoney("no interest yet", 0, net("5400"));
 
         // 500,000 on the 13th: 2nd to 13th = 12 days on 1,000,000 = 2,630.14 -> 2,630
-        deposit(member, "SAVINGS_DEPOSIT", 500_000, "2025-03-13");
+        long thirteenth = deposit(member, "SAVINGS_DEPOSIT", 500_000, "2025-03-13");
         assertEquals("2025-03-13", lastSavingsDate(member));
         assertMoney("interest to the 13th", 2_630, net("5400"));
+
+        // the deposit shows as one journal with the interest it booked: cash, interest expense, interest payable, savings
+        JsonNode journal = send("GET", "/api/entries/" + thirteenth, null, 200);
+        assertEquals(4, journal.get("generalLedger").size());
+        assertEquals(2, journal.get("memberLedger").size());
+        BigDecimal debits = BigDecimal.ZERO, credits = BigDecimal.ZERO;
+        for (JsonNode g : journal.get("generalLedger")) {
+            debits = debits.add(g.get("debit").decimalValue());
+            credits = credits.add(g.get("credit").decimalValue());
+        }
+        assertMoney("journal debits", 502_630, debits);
+        assertMoney("journal credits", 502_630, credits);
+        assertEquals("5400", journal.get("generalLedger").get(1).get("accountCode").asText());
 
         // 200,000 on the 20th: 20 - 13 = 7 days on 1,500,000 = 2,301.37 -> 2,301
         deposit(member, "SAVINGS_DEPOSIT", 200_000, "2025-03-20");

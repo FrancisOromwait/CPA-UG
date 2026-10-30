@@ -12,6 +12,14 @@ import java.time.LocalDate;
 import java.util.List;
 
 public interface LedgerRepository extends JpaRepository<LedgerEntry, Long> {
+    /** The savings interest booked by these savings entries (shown with them as one journal). */
+    List<LedgerEntry> findByInterestOfIdInOrderByIdAsc(java.util.Collection<Long> ids);
+
+    /** An entry is going: the interest it booked stays, no longer tied to it. */
+    @org.springframework.data.jpa.repository.Modifying(flushAutomatically = true)
+    @Query("update LedgerEntry l set l.interestOf = null where l.interestOf.id = :id")
+    int unlinkInterest(Long id);
+
     List<LedgerEntry> findByPayrollBatchId(Long payrollBatchId);
     List<LedgerEntry> findByDepositGroupOrderByIdAsc(String depositGroup);
     List<LedgerEntry> findByLoanIdOrderByIdAsc(Long loanId);

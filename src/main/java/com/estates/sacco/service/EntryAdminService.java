@@ -237,6 +237,7 @@ public class EntryAdminService {
     private void remove(LedgerEntry e) {
         SavingsAccrualService.Change gone = taken(e);
         removeLines(e);
+        ledger.unlinkInterest(e.getId());   // the interest booked up to its day was earned on the balance before it: it stays
         ledger.delete(e);
         ledger.flush();
         if (gone != null) posting.savingsChanged(List.of(gone));   // interest it had earned is taken back

@@ -186,6 +186,23 @@ public class SchemaFixer implements ApplicationRunner {
         }
         mergeBranchCharts();
         dropOldInterestStructures();
+        try {   // savings interest booked by a savings entry before the two were tied together: tie it to that day's savings entry
+            // the few bookings first (the old system's many interest lines have other references), then one small update each
+            int n = 0;
+            for (var r : jdbc.queryForList("""
+                select id, member_id, posted_on from ledger_entries
+                where type = 'SAVINGS_INTEREST' and interest_of_id is null and reference like '____-__-__ to ____-__-__'
+                """)) {
+                Long cause = jdbc.queryForObject("""
+                    select min(id) from ledger_entries where member_id = ? and posted_on = ?
+                      and type in ('SAVINGS_DEPOSIT', 'SAVINGS_WITHDRAWAL', 'SAVINGS_INTEREST_PAYOUT')
+                    """, Long.class, r.get("member_id"), r.get("posted_on"));
+                if (cause != null) n += jdbc.update("update ledger_entries set interest_of_id = ? where id = ?", cause, r.get("id"));
+            }
+            if (n > 0) log.info("Tied {} savings interest bookings to the savings entries that booked them", n);
+        } catch (Exception e) {
+            log.debug("Schema fix not needed or not supported here: {}", e.getMessage());
+        }
         for (String table : List.of("general_ledger", "member_ledger")) {
             try {
                 int n = jdbc.update("update " + table + " set branch_code = (select code from branches where branches.id = " + table
