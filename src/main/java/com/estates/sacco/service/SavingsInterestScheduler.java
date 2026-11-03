@@ -26,6 +26,11 @@ public class SavingsInterestScheduler {
     @EventListener(ApplicationReadyEvent.class)
     public void atStart() {
         bookDueMonths();
+        try {   // interest booked across savings entries before each entry carried its own (October 2026) is split per entry
+            service.spreadOverSavingsEntries();
+        } catch (RuntimeException e) {
+            log.error("Savings interest could not be spread over the savings entries", e);
+        }
     }
 
     public int bookDueMonths() {

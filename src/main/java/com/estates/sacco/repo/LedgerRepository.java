@@ -12,6 +12,9 @@ import java.time.LocalDate;
 import java.util.List;
 
 public interface LedgerRepository extends JpaRepository<LedgerEntry, Long> {
+    /** Entries of some types from a date on, oldest first (the savings interest spread over savings entries). */
+    List<LedgerEntry> findByTypeInAndPostedOnGreaterThanEqualOrderByPostedOnAscIdAsc(java.util.Collection<TxType> types, LocalDate from);
+
     /** The savings interest booked by these savings entries (shown with them as one journal). */
     List<LedgerEntry> findByInterestOfIdInOrderByIdAsc(java.util.Collection<Long> ids);
 

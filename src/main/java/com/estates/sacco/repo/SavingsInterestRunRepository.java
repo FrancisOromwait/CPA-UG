@@ -13,5 +13,7 @@ public interface SavingsInterestRunRepository extends JpaRepository<SavingsInter
 
     boolean existsByBranchIdAndKindAndPeriod(Long branchId, String kind, String period);
 
+    Optional<SavingsInterestRun> findFirstByBranchIdAndReference(Long branchId, String reference);
+
     Optional<SavingsInterestRun> findFirstByBranchIdOrderByPeriodEndDescIdDesc(Long branchId);
 }

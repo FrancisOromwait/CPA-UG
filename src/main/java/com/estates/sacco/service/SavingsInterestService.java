@@ -338,6 +338,82 @@ public class SavingsInterestService {
         log("Deleted the " + run.getKind().toLowerCase() + " " + run.getPeriod() + " of " + run.getTotalAmount(), run.getBranch(), run, user);
     }
 
+    // ------------------------------------------------------------------ spread over the savings entries
+    private static final java.util.regex.Pattern RANGE = java.util.regex.Pattern.compile("^(\\d{4}-\\d{2}-\\d{2}) to (\\d{4}-\\d{2}-\\d{2}):");
+
+    /**
+     * Every savings entry carries the interest of the days before it, and the month end only the days after the last one. Interest
+     * booked before that rule (October 2026's month end covered the whole month across its deposits) is split here: a booking whose
+     * days run across a member's savings entries is replaced by one booking per entry, tied to it, and one for the days after the
+     * last (keeping the month end's reference). Worked out on the savings as they are in the ledger, so the total stays the same but
+     * for rounding. Does nothing once everything is split; runs at start-up.
+     */
+    @Transactional
+    public int spreadOverSavingsEntries() {
+        if (!enabled()) return 0;
+        LocalDate from = accrual.start().plusDays(1);
+        // each member's savings entries by day (the first entry of a day carries that day's interest)
+        Map<Long, TreeMap<LocalDate, LedgerEntry>> savings = new HashMap<>();
+        for (LedgerEntry s : ledger.findByTypeInAndPostedOnGreaterThanEqualOrderByPostedOnAscIdAsc(
+                List.of(TxType.SAVINGS_DEPOSIT, TxType.SAVINGS_WITHDRAWAL, TxType.SAVINGS_INTEREST_PAYOUT), from)) {
+            savings.computeIfAbsent(s.getMember().getId(), k -> new TreeMap<>()).putIfAbsent(s.getPostedOn(), s);
+        }
+        int split = 0;
+        Set<String> monthEnds = new HashSet<>();
+        Map<String, Branch> branchOf = new HashMap<>();
+        for (LedgerEntry i : ledger.findByTypeInAndPostedOnGreaterThanEqualOrderByPostedOnAscIdAsc(List.of(TxType.SAVINGS_INTEREST), from)) {
+            if ("migration".equals(i.getCreatedBy()) || i.getNotes() == null) continue;
+            var range = RANGE.matcher(i.getNotes());
+            if (!range.find()) continue;   // an adjustment, or the old system's
+            LocalDate first = LocalDate.parse(range.group(1)), to = LocalDate.parse(range.group(2));
+            TreeMap<LocalDate, LedgerEntry> days = savings.get(i.getMember().getId());
+            if (days == null) continue;
+            NavigableMap<LocalDate, LedgerEntry> inside = days.subMap(first, true, to, false);
+            if (inside.isEmpty()) continue;   // no savings entry inside its days: already right
+
+            Member m = i.getMember();
+            Branch branch = i.getBranch();
+            boolean monthEnd = i.getReference() != null && i.getReference().startsWith("Month end ");
+            LedgerEntry endCause = i.getInterestOf();
+            generalLedger.deleteByLedgerEntryId(i.getId());
+            memberLedger.deleteByLedgerEntryId(i.getId());
+            ledger.delete(i);
+            ledger.flush();
+            LocalDate last = first.minusDays(1);
+            for (var d : inside.entrySet()) {
+                LedgerEntry cause = d.getValue();
+                accrual.accrue(m, branch, last, d.getKey(), null, i.getCreatedBy()).ifPresent(e -> {
+                    e.setInterestOf(cause);
+                    posting.recordLines(e);
+                });
+                last = d.getKey();
+            }
+            accrual.accrue(m, branch, last, to, monthEnd ? i.getReference() : null, i.getCreatedBy()).ifPresent(e -> {
+                e.setInterestOf(endCause);
+                posting.recordLines(e);
+            });
+            if (monthEnd) {
+                monthEnds.add(i.getReference());
+                branchOf.put(i.getReference(), branch);
+            }
+            split++;
+        }
+        // the month end now carries only the days after each member's last savings entry
+        for (String ref : monthEnds) {
+            Branch b = branchOf.get(ref);
+            runs.findFirstByBranchIdAndReference(b.getId(), ref).ifPresent(run -> {
+                List<LedgerEntry> left = ledger.findByBranchIdAndTypeAndReference(b.getId(), TxType.SAVINGS_INTEREST, ref);
+                run.setTotalAmount(left.stream().map(LedgerEntry::getAmount).reduce(BigDecimal.ZERO, BigDecimal::add));
+                run.setMemberCount(left.size());
+                runs.save(run);
+                audit.logSystem(b, "EDIT", "Savings interest", run.getId(), ref + ": the interest up to each savings entry now sits with that entry; "
+                        + "the month end keeps the days after the last one (" + run.getTotalAmount().toPlainString() + ")");
+            });
+        }
+        if (split > 0) log.info("Savings interest spread over the savings entries: {} bookings split", split);
+        return split;
+    }
+
     private void log(String what, Branch branch, SavingsInterestRun run, String user) {
         if (user == null) audit.logSystem(branch, "EDIT", "Savings interest", run.getId(), what);
         else audit.log(branch, "EDIT", "Savings interest", run.getId(), what);
