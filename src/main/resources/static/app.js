@@ -234,7 +234,7 @@ $('#chpw').addEventListener('click', () => modal({
 
 const REPORT_KIDS = [['reports/trial-balance', 'Trial balance'], ['reports/income-expenditure', 'Income & expenditure'],
   ['reports/balance-sheet', 'Balance sheet'], ['reports/member-statement', 'Member statement'], ['reports/member-summary', 'Member summary'],
-  ['reports/savings-report', 'Savings report'], ['reports/shares-report', 'Shares report'], ['reports/loan-report', 'Loan report']];
+  ['reports/savings-report', 'Savings report'], ['reports/shares-report', 'Shares report'], ['reports/loan-report', 'Loan report'], ['reports/last-interest-date', 'Last interest date']];
 const NAV_ADMIN = [
   ['dashboard', 'Dashboard'],
   ['f-accountsmenu', 'Accounts menu', [['reports/cashbook-receipts', 'Cashbook receipts'], ['reports/cashbook-payments', 'Cashbook payments'],
@@ -288,6 +288,7 @@ ICONS['reports/member-summary'] = ICONS.members;
 ICONS['reports/savings-report'] = ICONS.deposits;
 ICONS['reports/shares-report'] = '<path d="M12 3v9h9a9 9 0 1 1-9-9z"/><path d="M15 3.5a9 9 0 0 1 5.5 5.5H15z"/>';
 ICONS['reports/loan-report'] = ICONS.loans;
+ICONS['reports/last-interest-date'] = ICONS.interest;
 ICONS['d-acreports'] = '<path d="M4 20V10M10 20V4M16 20v-7M22 20H2"/>';
 ICONS.savingsinterest = ICONS.interest;
 ICONS['reports/cashbook-receipts'] = '<path d="M4 19.5V5a2 2 0 0 1 2-2h14v15H6a2 2 0 0 0-2 2 2 2 0 0 0 2 2h14v-4"/><path d="M12 6.5v7M9 10.5l3 3 3-3"/>';
@@ -1052,6 +1053,7 @@ const REPORTS = {
   'savings-report': { title: 'Savings report', range: false },
   'shares-report': { title: 'Shares report', range: false },
   'loan-report': { title: 'Loan report', range: false },
+  'last-interest-date': { title: 'Last interest date', range: false },
   'cashbook-receipts': { title: 'Cashbook receipts', range: true },
   'cashbook-payments': { title: 'Cashbook payments', range: true }
 };

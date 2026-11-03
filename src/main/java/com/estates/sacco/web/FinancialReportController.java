@@ -22,7 +22,7 @@ import java.util.List;
 /**
  * Financial reports as data ({@code /api/reports/{kind}}) or PDF ({@code /api/reports/{kind}/pdf}).
  * Kinds: trial-balance, income-expenditure, balance-sheet, member-statement, member-summary, savings-report, shares-report,
- * loan-report, cashbook-receipts, cashbook-payments.
+ * loan-report, last-interest-date, cashbook-receipts, cashbook-payments.
  * A branch admin always gets their own branch; the manager picks a branch or leaves it empty for all branches.
  */
 @RestController
@@ -93,6 +93,8 @@ public class FinancialReportController {
             case "savings-report", "shares-report", "loan-report":
                 return reports.balanceReport(scope.readBranch(branchId), end,
                         kind.equals("savings-report") ? "savings" : kind.equals("shares-report") ? "shares" : "loans");
+            case "last-interest-date":
+                return reports.lastInterestDateReport(scope.readBranch(branchId), end);
             case "cashbook-receipts", "cashbook-payments":
                 return reports.cashbook(scope.readBranch(branchId), accountId, from == null ? end.withDayOfMonth(1) : from, end,
                         kind.equals("cashbook-payments"));

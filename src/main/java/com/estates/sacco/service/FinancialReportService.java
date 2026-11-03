@@ -37,6 +37,7 @@ public class FinancialReportService {
     private final AccountCodes codes;
     private final MemberRepository members;
     private final ProductDefRepository products;
+    private final SavingsAccrualService savingsAccrual;
 
     private static final LocalDate EARLIEST = LocalDate.of(2000, 1, 1);
     private static final DateTimeFormatter DATE = DateTimeFormatter.ofPattern("dd MMM yyyy", Locale.ENGLISH);
@@ -244,6 +245,34 @@ public class FinancialReportService {
         if (parts.size() > 1) totals.add(new Kv(totalLabel, fmt(grand)));
         return new ReportDoc(title, branchLine(branchId), null, "As at " + asAt.format(DATE), totals,
                 List.of(new Section(who, cols, rows, totalRow)), rows.isEmpty() ? "No member has a balance here at this date." : null);
+    }
+
+    /**
+     * Each member with savings and the last day their savings interest is booked to (members.last_savings_date; before any booking
+     * here, the day before the first month), with the days since then: what the next deposit or the month end will book.
+     */
+    public ReportDoc lastInterestDateReport(Long branchId, LocalDate asAt) {
+        Map<Long, BigDecimal[]> byMember = balancesByMember(branchId, asAt);
+        List<Member> list = new ArrayList<>(members.search(branchId, null));
+        list.sort((a, b) -> compareMemberNo(a.getMemberNo(), b.getMemberNo()));
+        BigDecimal savings = BigDecimal.ZERO, owed = BigDecimal.ZERO;
+        List<List<String>> rows = new ArrayList<>();
+        for (Member m : list) {
+            BigDecimal[] c = byMember.get(m.getId());
+            if (c == null || (c[SAVINGS].signum() == 0 && c[SAVINGS_INTEREST].signum() == 0)) continue;
+            LocalDate last = savingsAccrual.lastDateOf(m);
+            long days = java.time.temporal.ChronoUnit.DAYS.between(last, asAt);
+            rows.add(List.of(m.getMemberNo(), m.getFullName(), blankZero(c[SAVINGS]), blankZero(c[SAVINGS_INTEREST]),
+                    last.format(DATE), days > 0 ? String.valueOf(days) : ""));
+            savings = savings.add(c[SAVINGS]);
+            owed = owed.add(c[SAVINGS_INTEREST]);
+        }
+        List<Col> cols = List.of(new Col("No", false), new Col("Member", false), new Col("Savings", true), new Col("Interest owed", true),
+                new Col("Last interest date", false), new Col("Days since", true));
+        List<String> totalRow = List.of("", "Total (" + rows.size() + " members)", fmt(savings), fmt(owed), "", "");
+        List<Kv> totals = List.of(new Kv("Savers", String.valueOf(rows.size())), new Kv("Savings", fmt(savings)), new Kv("Interest owed", fmt(owed)));
+        return new ReportDoc("Last Interest Date Report", branchLine(branchId), null, "As at " + asAt.format(DATE), totals,
+                List.of(new Section("Savers", cols, rows, totalRow)), rows.isEmpty() ? "No member has savings at this date." : null);
     }
 
     /** Where each figure sits in a member's balances (the member statement's columns). */

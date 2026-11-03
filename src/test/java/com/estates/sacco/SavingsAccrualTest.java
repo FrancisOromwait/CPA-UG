@@ -175,5 +175,11 @@ class SavingsAccrualTest {
         JsonNode adj = send("GET", "/api/entries/" + earlier, null, 200);
         assertEquals(4, adj.get("generalLedger").size());
         assertMoney("5 days x 80", 400, adj.get("generalLedger").get(1).get("debit").decimalValue());
+
+        // the last interest date report shows the member's last savings date
+        JsonNode report = send("GET", "/api/reports/last-interest-date", null, 200);
+        JsonNode row = report.get("sections").get(0).get("rows").get(0);
+        assertEquals("S1", row.get(0).asText());
+        assertEquals(java.time.LocalDate.parse(ahead).format(java.time.format.DateTimeFormatter.ofPattern("dd MMM yyyy", java.util.Locale.ENGLISH)), row.get(4).asText());
     }
 }
