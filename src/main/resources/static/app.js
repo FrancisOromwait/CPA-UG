@@ -1011,7 +1011,7 @@ views.gl = async el => {
                sel('accountCode', 'GL account', [], { blank: 'All accounts' })
              : sel('accountId', 'Account', accts.map(a => [a.id, `${a.code} – ${a.name}`]), { blank: 'All accounts' })) +
     inp('from', 'From', { type: 'date' }) + inp('to', 'To', { type: 'date' }) +
-    `<button class="btn">Apply</button></form><div id="glOut"></div></div>`;
+    `<button class="btn">Apply</button><button type="button" class="btn" id="glExcel">Export to Excel</button></form><div id="glOut"></div></div>`;
   const load = async () => {
     const f = fd($('#glFilter'));
     const qs = new URLSearchParams();
@@ -1040,14 +1040,26 @@ views.gl = async el => {
       accts.map(a => `<option value="${esc(a.code)}">${esc(a.code)} – ${esc(a.name)}</option>`).join('');
   }
   $('#glFilter').addEventListener('submit', e => { e.preventDefault(); load().catch(x => toast(x.message, true)); });
+  // the lines shown, as an Excel workbook (up to 2000, oldest first when a start date is chosen)
+  $('#glExcel').onclick = async () => {
+    const f = fd($('#glFilter')), qs = new URLSearchParams();
+    ['branchId', 'accountId', 'accountCode', 'from', 'to'].forEach(k => { if (f[k]) qs.set(k, f[k]); });
+    if (f.from) qs.set('oldestFirst', 'true');
+    try {
+      const a = document.createElement('a');
+      a.href = await pdfUrl('/api/general-ledger/xlsx?' + qs);
+      a.download = `general-ledger-${today()}.xlsx`;
+      document.body.appendChild(a); a.click(); a.remove();
+    } catch (x) { toast(x.message, true); }
+  };
   await load();
 };
 
 /* ------------------------------------------------------------------ reports (view on screen, open or download as PDF) */
 const REPORTS = {
-  'trial-balance': { title: 'Trial balance', range: false },
+  'trial-balance': { title: 'Trial balance', range: true, asAtWhenNoFrom: true },
   'income-expenditure': { title: 'Income & expenditure', range: true },
-  'balance-sheet': { title: 'Balance sheet', range: false },
+  'balance-sheet': { title: 'Balance sheet', range: true, asAtWhenNoFrom: true },
   'member-statement': { title: 'Member statement', range: true },
   'member-summary': { title: 'Member summary', range: false },
   'savings-report': { title: 'Savings report', range: false },
@@ -1138,10 +1150,12 @@ views.reports = async (el, kind) => {
       isStatement ? { req: 1, blank: 'Select a branch…' } : { blank: 'All branches (consolidated)' }) : '') +
     (isStatement ? sel('memberId', 'Member', [], { req: 1, blank: 'Select a member…' }) : '') +
     (isCashbook ? sel('accountId', 'Account', bookAccounts.map(a => [a.id, `${a.code} – ${a.name}`]), { blank: 'All cash, bank and mobile money' }) : '') +
-    (R.range ? inp('from', 'From', { type: 'date', value: fromDefault }) : '') +
+    // trial balance and balance sheet: an empty From gives the report as at the To date
+    (R.range ? inp('from', R.asAtWhenNoFrom ? 'From (empty = as at)' : 'From', { type: 'date', value: fromDefault }) : '') +
     inp('to', R.range ? 'To' : 'As at', { type: 'date', value: today() }) +
     `<button class="btn primary">View</button><button type="button" class="btn" id="repOpen">Open PDF</button>` +
     `<button type="button" class="btn" id="repDownload">Download PDF</button>` +
+    `<button type="button" class="btn" id="repExcel">Export to Excel</button>` +
     (isCashbook && !isMgr() ? `<button type="button" class="btn primary" id="cashAdd">+ New ${isPayments ? 'payment' : 'receipt'}</button>` : '') +
     `</form></div><div id="repOut"></div>`;
 
@@ -1226,6 +1240,17 @@ views.reports = async (el, kind) => {
       const a = document.createElement('a');
       a.href = await reportPdf(kind, query());
       a.download = `${kind}-${today()}.pdf`;
+      document.body.appendChild(a); a.click(); a.remove();
+    } catch (x) { toast(x.message, true); }
+  };
+
+  // the same report as an Excel workbook (pdfUrl fetches any file with the login and hands back a link to it)
+  $('#repExcel').onclick = async () => {
+    if (!form.reportValidity()) return;
+    try {
+      const a = document.createElement('a');
+      a.href = await pdfUrl(`/api/reports/${kind}/xlsx?${query()}`);
+      a.download = `${kind}-${today()}.xlsx`;
       document.body.appendChild(a); a.click(); a.remove();
     } catch (x) { toast(x.message, true); }
   };

@@ -50,6 +50,54 @@ public class FinancialReportService {
     }
 
     // ------------------------------------------------------------------ trial balance
+    /**
+     * With no {@code from}: the balances as at {@code to}. With a period: each account's opening balance (the day before {@code from}),
+     * the debits and credits in the period, and the closing balance; the closing columns are the trial balance as at {@code to}.
+     */
+    public ReportDoc trialBalance(Long branchId, LocalDate from, LocalDate to) {
+        if (from == null) return trialBalance(branchId, to);
+        Map<String, Bal> opening = byCode(balances(branchId, EARLIEST, from.minusDays(1)));
+        Map<String, Bal> moved = byCode(balances(branchId, from, to));
+        Set<String> codes = new TreeSet<>(opening.keySet());
+        codes.addAll(moved.keySet());
+        BigDecimal[] sum = new BigDecimal[6];
+        Arrays.fill(sum, BigDecimal.ZERO);
+        List<List<String>> rows = new ArrayList<>();
+        for (String code : codes) {
+            Bal o = opening.get(code), m = moved.get(code);
+            Bal any = o != null ? o : m;
+            BigDecimal open = o == null ? BigDecimal.ZERO : o.debitNet();
+            BigDecimal dr = m == null ? BigDecimal.ZERO : m.debit(), cr = m == null ? BigDecimal.ZERO : m.credit();
+            BigDecimal close = open.add(dr).subtract(cr);
+            if (open.signum() == 0 && dr.signum() == 0 && cr.signum() == 0) continue;
+            BigDecimal[] v = {open.max(BigDecimal.ZERO), open.min(BigDecimal.ZERO).negate(), dr, cr, close.max(BigDecimal.ZERO), close.min(BigDecimal.ZERO).negate()};
+            List<String> row = new ArrayList<>(List.of(any.code(), any.name()));
+            for (int i = 0; i < v.length; i++) {
+                row.add(blankZero(v[i]));
+                sum[i] = sum[i].add(v[i]);
+            }
+            rows.add(row);
+        }
+        List<String> totalRow = new ArrayList<>(List.of("", "Total"));
+        for (BigDecimal s : sum) totalRow.add(fmt(s));
+        boolean balanced = sum[4].compareTo(sum[5]) == 0;
+        Section s = new Section("Account balances",
+                List.of(CODE, ACCOUNT, new Col("Opening debit", true), new Col("Opening credit", true), new Col("Debit", true),
+                        new Col("Credit", true), new Col("Closing debit", true), new Col("Closing credit", true)),
+                rows, totalRow);
+        return new ReportDoc("Trial Balance", branchLine(branchId), null, from.format(DATE) + " to " + to.format(DATE),
+                List.of(new Kv("Debits in the period", fmt(sum[2])), new Kv("Credits in the period", fmt(sum[3])),
+                        new Kv("Closing debit", fmt(sum[4])), new Kv("Closing credit", fmt(sum[5])),
+                        new Kv("Status", balanced ? "Balanced" : "Out of balance")),
+                List.of(s), null);
+    }
+
+    private static Map<String, Bal> byCode(List<Bal> bals) {
+        Map<String, Bal> m = new HashMap<>();
+        bals.forEach(b -> m.put(b.code(), b));
+        return m;
+    }
+
     public ReportDoc trialBalance(Long branchId, LocalDate asAt) {
         List<List<String>> rows = new ArrayList<>();
         BigDecimal totalDebit = BigDecimal.ZERO, totalCredit = BigDecimal.ZERO;
@@ -96,6 +144,65 @@ public class FinancialReportService {
     }
 
     // ------------------------------------------------------------------ balance sheet
+    /**
+     * With no {@code from}: as at {@code to}. With a period: each account at the start (the day before {@code from}), its movement in
+     * the period, and at the end; the surplus or deficit to date is part of equity, so both ends balance.
+     */
+    public ReportDoc balanceSheet(Long branchId, LocalDate from, LocalDate to) {
+        if (from == null) return balanceSheet(branchId, to);
+        LocalDate start = from.minusDays(1);
+        List<Bal> open = balances(branchId, EARLIEST, start), close = balances(branchId, EARLIEST, to);
+        List<Col> cols = List.of(CODE, ACCOUNT, new Col("At " + start.format(DATE), true), new Col("Movement", true), new Col("At " + to.format(DATE), true));
+        BigDecimal[] assets = sideTotals(open, close, AccountType.ASSET, Bal::debitNet);
+        BigDecimal[] liabilities = sideTotals(open, close, AccountType.LIABILITY, Bal::creditNet);
+        BigDecimal[] equityAccounts = sideTotals(open, close, AccountType.EQUITY, Bal::creditNet);
+        BigDecimal[] result = {surplus(open), surplus(close)};
+        BigDecimal[] equity = {equityAccounts[0].add(result[0]), equityAccounts[1].add(result[1])};
+        List<List<String>> equityRows = compareLines(open, close, AccountType.EQUITY, Bal::creditNet);
+        equityRows.add(threeCols("", result[1].signum() >= 0 ? "Surplus to date" : "Deficit to date", result[0], result[1]));
+        List<Section> sections = List.of(
+                new Section("Assets", cols, compareLines(open, close, AccountType.ASSET, Bal::debitNet), threeCols("", "Total assets", assets[0], assets[1])),
+                new Section("Liabilities", cols, compareLines(open, close, AccountType.LIABILITY, Bal::creditNet),
+                        threeCols("", "Total liabilities", liabilities[0], liabilities[1])),
+                new Section("Equity", cols, equityRows, threeCols("", "Total equity", equity[0], equity[1])));
+        BigDecimal liabilitiesAndEquity = liabilities[1].add(equity[1]);
+        boolean balanced = assets[1].compareTo(liabilitiesAndEquity) == 0 && assets[0].compareTo(liabilities[0].add(equity[0])) == 0;
+        return new ReportDoc("Balance Sheet", branchLine(branchId), null, from.format(DATE) + " to " + to.format(DATE),
+                List.of(new Kv("Total assets", fmt(assets[1])), new Kv("Total liabilities", fmt(liabilities[1])),
+                        new Kv("Total equity", fmt(equity[1])), new Kv("Liabilities + equity", fmt(liabilitiesAndEquity)),
+                        new Kv("Surplus in the period", fmt(result[1].subtract(result[0])))),
+                sections, balanced ? null : "The balance sheet is out of balance. Check the general ledger.");
+    }
+
+    private static BigDecimal surplus(List<Bal> bals) {
+        return total(bals, AccountType.INCOME, Bal::creditNet).subtract(total(bals, AccountType.EXPENSE, Bal::debitNet));
+    }
+
+    private static BigDecimal[] sideTotals(List<Bal> open, List<Bal> close, AccountType type, Function<Bal, BigDecimal> amount) {
+        return new BigDecimal[] {total(open, type, amount), total(close, type, amount)};
+    }
+
+    /** One line per account of a type: at the start, the movement, at the end (accounts with nothing at either end are left out). */
+    private static List<List<String>> compareLines(List<Bal> open, List<Bal> close, AccountType type, Function<Bal, BigDecimal> amount) {
+        Map<String, Bal> o = byCode(open), c = byCode(close);
+        Set<String> codes = new TreeSet<>();
+        open.stream().filter(b -> b.type() == type).forEach(b -> codes.add(b.code()));
+        close.stream().filter(b -> b.type() == type).forEach(b -> codes.add(b.code()));
+        List<List<String>> rows = new ArrayList<>();
+        for (String code : codes) {
+            BigDecimal a = o.containsKey(code) ? amount.apply(o.get(code)) : BigDecimal.ZERO;
+            BigDecimal b = c.containsKey(code) ? amount.apply(c.get(code)) : BigDecimal.ZERO;
+            if (a.signum() == 0 && b.signum() == 0) continue;
+            Bal any = c.containsKey(code) ? c.get(code) : o.get(code);
+            rows.add(threeCols(any.code(), any.name(), a, b));
+        }
+        return rows;
+    }
+
+    private static List<String> threeCols(String code, String name, BigDecimal start, BigDecimal end) {
+        return new ArrayList<>(List.of(code, name, fmt(start), fmt(end.subtract(start)), fmt(end)));
+    }
+
     public ReportDoc balanceSheet(Long branchId, LocalDate asAt) {
         List<Bal> bals = balances(branchId, EARLIEST, asAt);
         BigDecimal assets = total(bals, AccountType.ASSET, Bal::debitNet);

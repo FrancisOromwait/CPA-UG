@@ -10,6 +10,7 @@ import org.springframework.http.MediaType;
 import org.springframework.test.web.servlet.MockMvc;
 
 import java.math.BigDecimal;
+import java.util.List;
 
 import static org.junit.jupiter.api.Assertions.assertEquals;
 import static org.springframework.security.test.web.servlet.request.SecurityMockMvcRequestPostProcessors.httpBasic;
@@ -175,6 +176,25 @@ class SavingsAccrualTest {
         JsonNode adj = send("GET", "/api/entries/" + earlier, null, 200);
         assertEquals(4, adj.get("generalLedger").size());
         assertMoney("5 days x 80", 400, adj.get("generalLedger").get(1).get("debit").decimalValue());
+
+        // trial balance and balance sheet for a period: opening, movement, closing, and they balance
+        JsonNode tb = send("GET", "/api/reports/trial-balance?from=2025-04-01&to=2025-04-30", null, 200);
+        assertEquals("Balanced", tb.get("totals").get(4).get("value").asText());
+        assertEquals(8, tb.get("sections").get(0).get("columns").size());
+        JsonNode bs = send("GET", "/api/reports/balance-sheet?from=2025-04-01&to=2025-04-30", null, 200);
+        assertEquals(true, bs.get("note").isNull());
+        assertEquals("Balanced", send("GET", "/api/reports/trial-balance", null, 200).get("totals").get(2).get("value").asText());
+
+        // every report, and the general ledger, as an Excel workbook
+        for (String url : List.of("/api/reports/trial-balance/xlsx?from=2025-04-01&to=2025-04-30", "/api/reports/balance-sheet/xlsx",
+                "/api/reports/income-expenditure/xlsx", "/api/reports/member-summary/xlsx", "/api/general-ledger/xlsx")) {
+            byte[] file = mvc.perform(get(url).with(httpBasic("admin", "admin-pass-1"))).andExpect(status().isOk())
+                    .andReturn().getResponse().getContentAsByteArray();
+            try (var wb = new org.apache.poi.xssf.usermodel.XSSFWorkbook(new java.io.ByteArrayInputStream(file))) {
+                String title = wb.getSheetAt(0).getRow(0).getCell(0).getStringCellValue();
+                assertEquals(true, !title.isBlank(), url);
+            }
+        }
 
         // the last interest date report shows the member's last savings date
         JsonNode report = send("GET", "/api/reports/last-interest-date", null, 200);

@@ -31,6 +31,7 @@ import java.util.List;
 public class FinancialReportController {
     private final FinancialReportService reports;
     private final PdfReportService pdf;
+    private final com.estates.sacco.service.XlsxReportService xlsx;
     private final LedgerService ledgerService;
     private final BranchScope scope;
     private final com.estates.sacco.service.MemberPhotoService photos;
@@ -74,16 +75,32 @@ public class FinancialReportController {
                 .body(bytes);
     }
 
+    /** The same report as an Excel workbook. */
+    @GetMapping("/{kind}/xlsx")
+    @Transactional(readOnly = true)
+    ResponseEntity<byte[]> xlsx(@PathVariable String kind,
+                                @RequestParam(required = false) Long branchId,
+                                @RequestParam(required = false) Long memberId,
+                                @RequestParam(required = false) Long accountId,
+                                @RequestParam(required = false) @DateTimeFormat(iso = DateTimeFormat.ISO.DATE) LocalDate from,
+                                @RequestParam(required = false) @DateTimeFormat(iso = DateTimeFormat.ISO.DATE) LocalDate to) {
+        byte[] bytes = xlsx.render(build(kind, branchId, memberId, accountId, from, to));
+        return ResponseEntity.ok()
+                .contentType(MediaType.parseMediaType("application/vnd.openxmlformats-officedocument.spreadsheetml.sheet"))
+                .header(HttpHeaders.CONTENT_DISPOSITION, ContentDisposition.attachment().filename(kind + "-" + LocalDate.now() + ".xlsx").build().toString())
+                .body(bytes);
+    }
+
     private ReportDoc build(String kind, Long branchId, Long memberId, Long accountId, LocalDate from, LocalDate to) {
         LocalDate end = to == null ? LocalDate.now() : to;
         switch (kind) {
             case "trial-balance":
-                return reports.trialBalance(scope.readBranch(branchId), end);
+                return reports.trialBalance(scope.readBranch(branchId), from, end);
             case "income-expenditure":
                 return reports.incomeExpenditure(scope.readBranch(branchId),
                         from == null ? LocalDate.of(end.getYear(), 1, 1) : from, end);
             case "balance-sheet":
-                return reports.balanceSheet(scope.readBranch(branchId), end);
+                return reports.balanceSheet(scope.readBranch(branchId), from, end);
             case "member-statement":
                 if (memberId == null) throw new ApiException(HttpStatus.BAD_REQUEST, "Choose a member");
                 Member m = ledgerService.requireMember(memberId);

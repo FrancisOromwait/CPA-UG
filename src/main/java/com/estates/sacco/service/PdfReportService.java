@@ -40,9 +40,11 @@ public class PdfReportService {
     public byte[] render(ReportDoc doc, String generatedBy, byte[] photo) {
         ByteArrayOutputStream out = new ByteArrayOutputStream();
         // the member statement has a column for every kind of account, so it is printed wide with a line round every cell;
-        // the member summary has the same columns, so it is printed wide too
+        // the member summary has the same columns, so it is printed wide too, as is any report with seven or more columns
+        // (the trial balance for a period: opening, movement and closing)
         boolean grid = "Member Statement".equals(doc.title());
-        boolean wide = grid || "Member Summary".equals(doc.title());
+        boolean wide = grid || "Member Summary".equals(doc.title())
+                || doc.sections().stream().anyMatch(s -> s.columns().size() >= 7);
         Document d = new Document(wide ? PageSize.A4.rotate() : PageSize.A4, 36, 36, 40, 50);
         try {
             PdfWriter writer = PdfWriter.getInstance(d, out);

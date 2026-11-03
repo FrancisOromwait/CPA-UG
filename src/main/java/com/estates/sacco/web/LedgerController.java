@@ -26,6 +26,7 @@ public class LedgerController {
     private final GeneralLedgerRepository generalLedger;
     private final LedgerService ledgerService;
     private final BranchScope scope;
+    private final com.estates.sacco.service.XlsxReportService xlsx;
 
     // ---- member ledger
     public record MlLine(Long id, LocalDate date, String branchCode, String productCode, ProductCategory category, String description,
@@ -68,6 +69,48 @@ public class LedgerController {
                          String accountName, String productCode, String memberNo, String description,
                          BigDecimal debit, BigDecimal credit, Long entryId, Long journalId,
                          BigDecimal balance, String balanceSide) {}
+
+    /** The general ledger lines the screen shows (same filters), as an Excel workbook. */
+    @GetMapping("/api/general-ledger/xlsx")
+    @Transactional(readOnly = true)
+    org.springframework.http.ResponseEntity<byte[]> generalLedgerXlsx(@RequestParam(required = false) Long branchId,
+                               @RequestParam(required = false) Long accountId,
+                               @RequestParam(required = false) String accountCode,
+                               @RequestParam(required = false) @DateTimeFormat(iso = DateTimeFormat.ISO.DATE) LocalDate from,
+                               @RequestParam(required = false) @DateTimeFormat(iso = DateTimeFormat.ISO.DATE) LocalDate to,
+                               @RequestParam(defaultValue = "2000") int limit,
+                               @RequestParam(defaultValue = "false") boolean oldestFirst) {
+        List<GlLine> lines = generalLedger(branchId, accountId, accountCode, from, to, limit, oldestFirst);
+        java.time.format.DateTimeFormatter dmy = java.time.format.DateTimeFormatter.ofPattern("dd/MM/yyyy");
+        BigDecimal dr = BigDecimal.ZERO, cr = BigDecimal.ZERO;
+        List<List<String>> rows = new ArrayList<>();
+        for (GlLine l : lines) {
+            rows.add(List.of(l.date().format(dmy), nz(l.journalNo()), l.accountCode() + " " + l.accountName(), nz(l.productCode()), nz(l.memberNo()),
+                    nz(l.description()), amount(l.debit()), amount(l.credit())));
+            dr = dr.add(l.debit());
+            cr = cr.add(l.credit());
+        }
+        var cols = List.of(new com.estates.sacco.service.ReportDoc.Col("Date", false), new com.estates.sacco.service.ReportDoc.Col("Journal", false),
+                new com.estates.sacco.service.ReportDoc.Col("Account", false), new com.estates.sacco.service.ReportDoc.Col("Product ID", false),
+                new com.estates.sacco.service.ReportDoc.Col("Member", false), new com.estates.sacco.service.ReportDoc.Col("Description", false),
+                new com.estates.sacco.service.ReportDoc.Col("Debit", true), new com.estates.sacco.service.ReportDoc.Col("Credit", true));
+        String period = (from == null ? "From the start" : "From " + from.format(dmy)) + (to == null ? "" : " to " + to.format(dmy));
+        var doc = new com.estates.sacco.service.ReportDoc("General Ledger", null, null, period, List.of(),
+                List.of(new com.estates.sacco.service.ReportDoc.Section(lines.size() + " lines", cols, rows,
+                        List.of("", "", "", "", "", "Total", amount(dr), amount(cr)))), null);
+        return org.springframework.http.ResponseEntity.ok()
+                .contentType(org.springframework.http.MediaType.parseMediaType("application/vnd.openxmlformats-officedocument.spreadsheetml.sheet"))
+                .header(org.springframework.http.HttpHeaders.CONTENT_DISPOSITION, "attachment; filename=\"general-ledger-" + LocalDate.now() + ".xlsx\"")
+                .body(xlsx.render(doc));
+    }
+
+    private static String nz(String s) {
+        return s == null ? "" : s;
+    }
+
+    private static String amount(BigDecimal v) {
+        return v == null || v.signum() == 0 ? "" : String.format(Locale.US, "%,.2f", v);
+    }
 
     @GetMapping("/api/general-ledger")
     @Transactional(readOnly = true)
