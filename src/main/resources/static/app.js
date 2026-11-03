@@ -1663,7 +1663,7 @@ views.savingsinterest = async el => {
       : `<p class="muted">Savings interest is not switched on.</p>`) + `</div>` +
     `<div class="panel"><form class="toolbar" id="svFilter">` + inp('month', 'Month', { type: 'month', req: 1, value: defaultMonth }) +
     `<button class="btn primary">View interest</button></form><div id="svOut"></div></div>` +
-    `<div class="panel"><h3>Pay the interest into savings</h3><form class="toolbar" id="svPayFilter">` + inp('date', 'Date of payment', { type: 'date', req: 1, value: today() }) +
+    `<div class="panel"><h3>Pay the interest into savings</h3><form class="toolbar" id="svPayFilter">` + inp('date', 'Date of payment (type the day you pay out)', { type: 'date', req: 1 }) +
     `<button class="btn primary">View interest owed</button></form><div id="svPay"></div></div>` +
     `<div class="panel"><h3>Savings interest booked so far</h3><div id="svRuns"></div></div>`;
 
@@ -1717,6 +1717,8 @@ views.savingsinterest = async el => {
 
   const viewOwed = async () => {
     const f = fd($('#svPayFilter'));
+    // no date chosen yet: nothing is worked out (the payout date is always typed, never assumed to be today)
+    if (!f.date) { $('#svPay').innerHTML = '<div class="empty">Type the date you are paying out, then View interest owed.</div>'; return; }
     const o = await api('/api/savings-interest/owed?' + new URLSearchParams({ date: f.date }));
     $('#svPay').innerHTML = (o.members.length ? table([
       { h: 'Member', f: r => `${esc(r.memberNo)} · ${esc(r.memberName)}` },
@@ -1727,7 +1729,7 @@ views.savingsinterest = async el => {
         `<span class="muted">Each member's savings go up by what they are owed, and what is owed goes down to nothing.</span></div>` : '');
     const b = $('#svPayBtn');
     if (b) b.onclick = async () => {
-      if (!confirm(`Pay UGX ${money(o.total)} of interest into the savings of ${o.members.length} members, dated ${o.date}?`)) return;
+      if (!confirm(`Pay UGX ${money(o.total)} of interest into the savings of ${o.members.length} members.\n\nPayout date: ${o.date}\n\nInterest is first booked for every member up to this date. Is this the date you are paying out?`)) return;
       b.disabled = true;
       try { await api('/api/savings-interest/payout', { method: 'POST', body: { date: o.date } }); toast('Interest paid into savings'); await Promise.all([viewOwed(), loadRuns()]); }
       catch (x) { toast(x.message, true); b.disabled = false; }
