@@ -102,6 +102,40 @@ public class SchemaFixer implements ApplicationRunner {
     }
 
     /**
+     * The old system booked a deposit's savings interest in the same journal as the deposit; both came over as entries with the same
+     * member, date and journal number (the reference). Tie each such interest line to its deposit or withdrawal so the deposit's view
+     * shows them as one journal again. Its month-end lines ("08/ 2026") and adjustments ("Adj/...") belong to no deposit. Matched in
+     * memory: two plain reads, then one small update each. Safe to run again: only untied lines are looked at.
+     */
+    private void tieOldSystemInterest() {
+        try {
+            List<java.util.Map<String, Object>> interest = jdbc.queryForList("""
+                select id, member_id, cast(posted_on as char) day, reference from ledger_entries
+                where type = 'SAVINGS_INTEREST' and created_by = 'migration' and interest_of_id is null and reference is not null
+                  and reference not like '__/ ____' and reference not like 'Adj/%'
+                """);
+            if (interest.isEmpty()) return;
+            java.util.Map<String, Long> deposits = new java.util.HashMap<>();
+            jdbc.query("""
+                select id, member_id, cast(posted_on as char) day, reference from ledger_entries
+                where created_by = 'migration' and type in ('SAVINGS_DEPOSIT', 'SAVINGS_WITHDRAWAL') and reference is not null
+                """, rs -> {
+                deposits.merge(rs.getLong("member_id") + "|" + rs.getString("day") + "|" + rs.getString("reference"), rs.getLong("id"), Math::min);
+            });
+            List<Object[]> ties = new java.util.ArrayList<>();
+            for (var r : interest) {
+                Long deposit = deposits.get(r.get("member_id") + "|" + r.get("day") + "|" + r.get("reference"));
+                if (deposit != null) ties.add(new Object[] {deposit, r.get("id")});
+            }
+            if (ties.isEmpty()) return;
+            jdbc.batchUpdate("update ledger_entries set interest_of_id = ? where id = ?", ties);
+            log.info("Tied {} savings interest lines from the old system to their deposits ({} have no deposit of their own)", ties.size(), interest.size() - ties.size());
+        } catch (Exception e) {
+            log.warn("Old system interest not tied: {}", e.toString());
+        }
+    }
+
+    /**
      * The loan application fee is taken out of what is paid out (one payout, bank credited with the net amount, fee to income).
      * Earlier the fee was booked as a separate entry; remove those, and clear the ledger lines of payouts that do not carry the
      * fee yet so the startup posting step re-posts them correctly. Safe to run again: it only touches what is not yet correct.
@@ -190,19 +224,20 @@ public class SchemaFixer implements ApplicationRunner {
             // the few bookings first (the old system's many interest lines have other references), then one small update each
             int n = 0;
             for (var r : jdbc.queryForList("""
-                select id, member_id, posted_on from ledger_entries
+                select id, member_id, cast(posted_on as char) day from ledger_entries
                 where type = 'SAVINGS_INTEREST' and interest_of_id is null and reference like '____-__-__ to ____-__-__'
                 """)) {
                 Long cause = jdbc.queryForObject("""
                     select min(id) from ledger_entries where member_id = ? and posted_on = ?
                       and type in ('SAVINGS_DEPOSIT', 'SAVINGS_WITHDRAWAL', 'SAVINGS_INTEREST_PAYOUT')
-                    """, Long.class, r.get("member_id"), r.get("posted_on"));
+                    """, Long.class, r.get("member_id"), r.get("day"));
                 if (cause != null) n += jdbc.update("update ledger_entries set interest_of_id = ? where id = ?", cause, r.get("id"));
             }
             if (n > 0) log.info("Tied {} savings interest bookings to the savings entries that booked them", n);
         } catch (Exception e) {
             log.debug("Schema fix not needed or not supported here: {}", e.getMessage());
         }
+        tieOldSystemInterest();
         for (String table : List.of("general_ledger", "member_ledger")) {
             try {
                 int n = jdbc.update("update " + table + " set branch_code = (select code from branches where branches.id = " + table
