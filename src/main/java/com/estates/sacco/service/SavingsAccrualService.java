@@ -31,7 +31,8 @@ import java.util.*;
  * A savings entry dated on or before the last savings date (made late, edited or deleted) earned interest that is not booked,
  * or was booked and is not earned: the difference, amount x rate x days up to the last savings date, is booked or taken back
  * (Dr Savings interest payable, Cr Savings interest expense) on the last savings date. The days before the first month here
- * belong to the old system and are left alone. An entry dated in the future waits: the next entry or the month end books it.
+ * belong to the old system and are left alone. An entry dated ahead of today books its days like any other: entries typed in later
+ * with earlier dates are then corrected by the adjustment above.
  * <p>
  * The interest entries are saved here and handed back; {@link PostingService} writes their ledger lines.
  */
@@ -113,7 +114,6 @@ public class SavingsAccrualService {
         Member m = members.findById(c.member().getId()).orElseThrow();
         LocalDate last = lastDateOf(m);
         if (c.date().isAfter(last)) {
-            if (c.date().isAfter(LocalDate.now())) return;   // a future date: booked when its day has come
             accrue(m, c.branch(), last, c.date(), null, c.user()).ifPresent(e -> out.add(tie(e, c)));
             m.setLastSavingsDate(c.date());
             members.save(m);

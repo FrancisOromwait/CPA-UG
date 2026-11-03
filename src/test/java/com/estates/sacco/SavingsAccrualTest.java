@@ -160,5 +160,16 @@ class SavingsAccrualTest {
         assertEquals("2025-04-15", lastSavingsDate(member));
         assertMoney("expense to the payout", 9_030 + 5_589, net("5400"));
         assertMoney("nothing owed after the payout", 0, net("2300"));
+
+        // a deposit dated ahead of today carries its days at once, like any other
+        String ahead = java.time.LocalDate.now().plusDays(10).toString();
+        long future = deposit(member, "SAVINGS_DEPOSIT", 100_000, ahead);
+        assertEquals(ahead, lastSavingsDate(member));
+        assertEquals(4, send("GET", "/api/entries/" + future, null, 200).get("generalLedger").size());
+        // one typed in afterwards with an earlier date gets its days up to then as an adjustment, in its own journal
+        long earlier = deposit(member, "SAVINGS_DEPOSIT", 365_000, java.time.LocalDate.now().plusDays(5).toString());
+        JsonNode adj = send("GET", "/api/entries/" + earlier, null, 200);
+        assertEquals(4, adj.get("generalLedger").size());
+        assertMoney("5 days x 80", 400, adj.get("generalLedger").get(1).get("debit").decimalValue());
     }
 }
