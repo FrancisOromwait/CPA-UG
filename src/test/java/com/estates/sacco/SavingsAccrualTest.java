@@ -154,11 +154,15 @@ class SavingsAccrualTest {
         // April cannot be skipped to May
         send("POST", "/api/savings-interest/runs", "{\"month\":\"2025-05\"}", 400);
 
-        // paid out on 15 April: first 1st to 15th = 15 days on 1,700,000 = 5,589.04 -> 5,589, then all 14,619 owed goes into savings
-        JsonNode payout = send("POST", "/api/savings-interest/payout", "{\"date\":\"2025-04-15\"}", 201);
-        assertMoney("paid into savings", 9_030 + 5_589, payout.get("totalAmount").decimalValue());
-        assertEquals("2025-04-15", lastSavingsDate(member));
-        assertMoney("expense to the payout", 9_030 + 5_589, net("5400"));
+        // interest is paid out at a month end only, once that month end is booked
+        send("POST", "/api/savings-interest/payout", "{\"date\":\"2025-04-15\"}", 400);
+        send("POST", "/api/savings-interest/payout", "{\"date\":\"2025-04-30\"}", 400);
+        // April: 30 days on 1,700,000 = 11,178.08 -> 11,178; then all 20,208 owed goes into savings
+        send("POST", "/api/savings-interest/runs", "{\"month\":\"2025-04\"}", 201);
+        JsonNode payout = send("POST", "/api/savings-interest/payout", "{\"date\":\"2025-04-30\"}", 201);
+        assertMoney("paid into savings", 9_030 + 11_178, payout.get("totalAmount").decimalValue());
+        assertEquals("2025-04-30", lastSavingsDate(member));
+        assertMoney("expense to the payout", 9_030 + 11_178, net("5400"));
         assertMoney("nothing owed after the payout", 0, net("2300"));
 
         // a deposit dated ahead of today carries its days at once, like any other

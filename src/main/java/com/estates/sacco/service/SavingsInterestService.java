@@ -243,6 +243,14 @@ public class SavingsInterestService {
     public SavingsInterestRun payout(Long branchId, LocalDate date, String user) {
         if (!enabled()) throw new ApiException(HttpStatus.BAD_REQUEST, "Savings interest is not switched on");
         if (date.isAfter(LocalDate.now())) throw new ApiException(HttpStatus.BAD_REQUEST, "The payout cannot be dated in the future");
+        // paid out at a month end, once that month's interest is booked: the payout itself then books no interest of its own
+        YearMonth month = YearMonth.from(date);
+        if (!date.equals(month.atEndOfMonth())) {
+            throw new ApiException(HttpStatus.BAD_REQUEST, "Savings interest is paid out at the end of a month (" + month.atEndOfMonth() + ")");
+        }
+        if (!month.isBefore(first()) && !runs.existsByBranchIdAndKindAndPeriod(branchId, SavingsInterestRun.ACCRUAL, month.toString())) {
+            throw new ApiException(HttpStatus.BAD_REQUEST, "Book the month end of " + month + " first");
+        }
         if (runs.existsByBranchIdAndKindAndPeriod(branchId, SavingsInterestRun.PAYOUT, date.toString())) {
             throw new ApiException(HttpStatus.CONFLICT, "Savings interest was already paid out on " + date);
         }
@@ -412,6 +420,112 @@ public class SavingsInterestService {
         }
         if (split > 0) log.info("Savings interest spread over the savings entries: {} bookings split", split);
         return split;
+    }
+
+    // ------------------------------------------------------------------ payouts only at a month end
+    private static final java.util.regex.Pattern RANGE_REF = java.util.regex.Pattern.compile("^\\d{4}-\\d{2}-\\d{2} to \\d{4}-\\d{2}-\\d{2}$");
+
+    /**
+     * Interest is paid out at month ends only. A payout made on another day (3 November 2026) booked every member's interest up to
+     * its day and moved their last savings date there, so the deposits after it carried fewer days. Such a payout is taken out, with
+     * the interest it booked (and any left behind by one already deleted: untied "from to to" bookings), and the month is worked
+     * out again from its deposits. Runs at start-up; does nothing when there is nothing to repair.
+     */
+    @Transactional
+    public int repairPayoutsOffMonthEnd() {
+        if (!enabled()) return 0;
+        int done = 0;
+        for (Branch b : branches.findAll()) {
+            YearMonth from = null;
+            for (SavingsInterestRun r : runs.search(b.getId())) {
+                if (SavingsInterestRun.PAYOUT.equals(r.getKind()) && !r.getPeriodEnd().equals(YearMonth.from(r.getPeriodEnd()).atEndOfMonth())) {
+                    from = earlier(from, YearMonth.from(r.getPeriodEnd()));
+                }
+            }
+            for (LedgerEntry i : ledger.findByTypeInAndPostedOnGreaterThanEqualOrderByPostedOnAscIdAsc(List.of(TxType.SAVINGS_INTEREST), accrual.start().plusDays(1))) {
+                if (!i.getBranch().getId().equals(b.getId()) || "migration".equals(i.getCreatedBy()) || i.getInterestOf() != null
+                        || i.getReference() == null || !RANGE_REF.matcher(i.getReference()).matches()) continue;
+                YearMonth m = YearMonth.from(i.getPostedOn());
+                if (!runs.existsByBranchIdAndKindAndPeriod(b.getId(), SavingsInterestRun.ACCRUAL, m.toString())) from = earlier(from, m);
+            }
+            if (from != null && rebuildFrom(b, from)) done++;
+        }
+        return done;
+    }
+
+    private static YearMonth earlier(YearMonth a, YearMonth b) {
+        return a == null || b.isBefore(a) ? b : a;
+    }
+
+    /**
+     * Works a month's savings interest out again from its savings entries, while the month end is not booked yet: payouts dated in
+     * it or later and every interest booking of the system from its first day on are taken out, each member goes back to the end of
+     * the month before, and each savings entry books the days since the one before it, tied to it, as when it was entered.
+     */
+    private boolean rebuildFrom(Branch b, YearMonth month) {
+        LocalDate first = month.atDay(1);
+        for (SavingsInterestRun r : runs.search(b.getId())) {
+            if (SavingsInterestRun.ACCRUAL.equals(r.getKind()) && !r.getPeriodEnd().isBefore(first)) {
+                log.warn("Savings interest from {} not worked out again: the month end of {} is booked", month, r.getPeriod());
+                return false;
+            }
+        }
+        BigDecimal paidBack = BigDecimal.ZERO;
+        for (SavingsInterestRun r : runs.search(b.getId())) {
+            if (!SavingsInterestRun.PAYOUT.equals(r.getKind()) || r.getPeriodEnd().isBefore(first)) continue;
+            for (LedgerEntry e : ledger.findByBranchIdAndTypeAndReference(b.getId(), TxType.SAVINGS_INTEREST_PAYOUT, r.getReference())) remove(e);
+            paidBack = paidBack.add(r.getTotalAmount());
+            runs.delete(r);
+        }
+        BigDecimal before = BigDecimal.ZERO;
+        for (LedgerEntry i : ledger.findByTypeInAndPostedOnGreaterThanEqualOrderByPostedOnAscIdAsc(
+                List.of(TxType.SAVINGS_INTEREST, TxType.SAVINGS_INTEREST_REVERSAL), first)) {
+            if (!i.getBranch().getId().equals(b.getId()) || "migration".equals(i.getCreatedBy())) continue;
+            before = before.add(i.getType() == TxType.SAVINGS_INTEREST ? i.getAmount() : i.getAmount().negate());
+            remove(i);
+        }
+        ledger.flush();
+        LocalDate back = first.minusDays(1);
+        List<Member> inBranch = members.findAll().stream().filter(m -> m.getBranch() != null && m.getBranch().getId().equals(b.getId())).toList();
+        for (Member m : inBranch) {
+            if (m.getLastSavingsDate() != null && !m.getLastSavingsDate().isBefore(first)) {
+                m.setLastSavingsDate(back.isAfter(accrual.start()) ? back : null);
+                members.save(m);
+            }
+        }
+        // each savings entry from the first day on books the days since the one before it, in date order
+        BigDecimal after = BigDecimal.ZERO;
+        Map<Long, Member> byId = new HashMap<>();
+        inBranch.forEach(m -> byId.put(m.getId(), m));
+        for (LedgerEntry s : ledger.findByTypeInAndPostedOnGreaterThanEqualOrderByPostedOnAscIdAsc(
+                List.of(TxType.SAVINGS_DEPOSIT, TxType.SAVINGS_WITHDRAWAL, TxType.SAVINGS_INTEREST_PAYOUT), first)) {
+            Member m = byId.get(s.getMember().getId());
+            if (m == null) continue;
+            LocalDate last = accrual.lastDateOf(m);
+            if (!s.getPostedOn().isAfter(last)) continue;   // a second entry on the same day: the first carries the days
+            Optional<LedgerEntry> e = accrual.accrue(m, b, last, s.getPostedOn(), null, s.getCreatedBy());
+            if (e.isPresent()) {
+                e.get().setInterestOf(s);
+                posting.recordLines(e.get());
+                after = after.add(e.get().getAmount());
+            }
+            m.setLastSavingsDate(s.getPostedOn());
+            members.save(m);
+        }
+        String what = "Savings interest from " + first + " worked out again from the savings entries (payouts are made at month ends): "
+                + (paidBack.signum() > 0 ? "payout of " + paidBack.toPlainString() + " taken back, " : "")
+                + "interest " + before.toPlainString() + " booked before, " + after.toPlainString() + " now; the month end books the rest";
+        audit.logSystem(b, "EDIT", "Savings interest", null, what);
+        log.info(what);
+        return true;
+    }
+
+    /** Takes an entry and its ledger lines out. */
+    private void remove(LedgerEntry e) {
+        generalLedger.deleteByLedgerEntryId(e.getId());
+        memberLedger.deleteByLedgerEntryId(e.getId());
+        ledger.unlinkInterest(e.getId());
+        ledger.delete(e);
     }
 
     private void log(String what, Branch branch, SavingsInterestRun run, String user) {

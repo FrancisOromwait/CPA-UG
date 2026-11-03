@@ -25,6 +25,11 @@ public class SavingsInterestScheduler {
 
     @EventListener(ApplicationReadyEvent.class)
     public void atStart() {
+        try {   // a payout made on a day other than a month end (3 November 2026) is taken out and its month worked out again
+            service.repairPayoutsOffMonthEnd();
+        } catch (RuntimeException e) {
+            log.error("Savings interest payouts off a month end could not be repaired", e);
+        }
         bookDueMonths();
         try {   // interest booked across savings entries before each entry carried its own (October 2026) is split per entry
             service.spreadOverSavingsEntries();
