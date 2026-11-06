@@ -2073,12 +2073,23 @@ const editors = {
   async member(id) {
     const m = (await api('/api/members')).find(x => String(x.id) === String(id));
     if (!m) { toast('Member not found', true); return; }
+    // the whole membership application form, as when the member was added (the NIN comes from it: the member list does not carry it)
+    const a = await api(`/api/members/${encodeURIComponent(id)}/application`);
     modal({
-      title: `Edit member ${m.memberNo}`, submit: 'Save changes',
-      body: `<div class="row2">${inp('memberNo', 'Member no.', { req: 1, value: m.memberNo })}${inp('fullName', 'Full name', { req: 1, value: m.fullName })}</div>` +
-        `<div class="row2">${inp('phone', 'Phone', { value: m.phone || '' })}${inp('nationalId', 'National ID', { value: m.nationalId || '' })}</div>` +
-        `<div class="row2">${inp('employer', 'Employer', { value: m.employer || '' })}${inp('payrollNo', 'Payroll no.', { value: m.payrollNo || '' })}</div>`,
-      onSubmit: async f => { await api(`/api/members/${id}`, { method: 'PUT', body: fd(f) }); toast('Member updated'); route(); }
+      title: `Membership application form · ${m.memberNo}`, submit: 'Save changes', wide: true,
+      body: `<h4 style="margin-top:0">Member</h4>` +
+        `<div class="row2">${inp('memberNo', 'Member no. (CSM/…)', { req: 1, value: m.memberNo })}${inp('fullName', 'Name', { req: 1, value: m.fullName })}</div>` +
+        `<div class="row2">${inp('phone', 'Telephone (all mobile lines)', { value: a.phone || '' })}${inp('nationalId', 'NIN (National ID)', { value: a.nationalId || '' })}</div>` +
+        `<div class="row2">${inp('employer', 'Place of work (current employer)', { value: a.employer || '' })}${inp('payrollNo', 'Payroll no.', { value: m.payrollNo || '' })}</div>` +
+        `<h4>Application details</h4>` + appFields(a),
+      onMount: f => appMount(f, a),
+      onSubmit: async f => {
+        const v = fd(f);
+        await api(`/api/members/${id}`, { method: 'PUT', body: { memberNo: v.memberNo, fullName: v.fullName, phone: v.phone,
+          nationalId: v.nationalId, employer: v.employer, payrollNo: v.payrollNo } });
+        await api(`/api/members/${id}/application`, { method: 'PUT', body: appBody(v) });
+        toast('Member and application form updated'); route();
+      }
     });
   },
   async journal(id) { return journalModal(await api(`/api/journals/${id}`)); },
