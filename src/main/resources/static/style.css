@@ -304,3 +304,12 @@ hr.sep { border: 0; border-top: 1px solid var(--line); margin: 6px 0 2px; }
 .rel-row > span { padding-bottom: 10px; }
 .modal h4 { margin: 18px 0 6px; }
 @media (max-width: 640px) { .rel-row { grid-template-columns: 1fr; } .rel-row > span { padding-bottom: 0; } }
+
+/* the passport photo box in the application form window, beside the member's own details */
+.member-form-head { display: flex; gap: 18px; align-items: flex-start; }
+.member-form-head .grow { flex: 1; min-width: 0; }
+.form-photo { display: flex; flex-direction: column; align-items: center; gap: 8px; width: 150px; flex-shrink: 0; }
+.form-photo .photo-box .photo, .form-photo .photo-box .no-photo { width: 120px; height: 140px; border-radius: 6px; border: 2px solid var(--blue); object-fit: cover; display: flex; align-items: center; justify-content: center; text-align: center; padding: 6px; background: var(--blue-soft); color: var(--muted); font-size: 12px; }
+.form-photo .photo-box .photo { padding: 0; background: var(--white); }
+.form-photo .photo-btns { display: flex; flex-direction: column; gap: 6px; width: 100%; }
+@media (max-width: 640px) { .member-form-head { flex-direction: column-reverse; align-items: stretch; } .form-photo { width: 100%; } }

@@ -670,6 +670,43 @@ function appBody(v) {
     beneficiaries: list('b', 3), children: list('c', 6), mother: parentOf('mother', 'Mother'), father: parentOf('father', 'Father') };
 }
 
+/**
+ * The passport photo box of the application form window: shows the photo, and Add / Take / Remove it. Nothing is sent until
+ * the window is saved: {@link savePhotoField} then stores the new photo or takes the old one away.
+ */
+const photoFieldHtml = () => `<div class="form-photo"><div class="photo-box" data-fp-box></div>` +
+  `<input type="file" accept="image/*" data-fp-file hidden><input type="file" accept="image/*" capture="user" data-fp-cam hidden>` +
+  `<div class="photo-btns"><button type="button" class="btn small" data-fp-pick>Add photo</button>` +
+  `<button type="button" class="btn small" data-fp-take>Take photo</button>` +
+  `<button type="button" class="btn small danger" data-fp-del hidden>Remove photo</button></div></div>`;
+
+function mountPhotoField(f, existingUrl) {
+  const st = { url: existingUrl || null, data: null, remove: false };
+  const draw = () => {
+    const shown = st.data || (st.remove ? null : st.url);
+    $('[data-fp-box]', f).innerHTML = shown ? `<img class="photo" src="${shown}" alt="Passport photo">` : '<div class="no-photo">Affix passport photo</div>';
+    $('[data-fp-pick]', f).textContent = shown ? 'Change photo' : 'Add photo';
+    $('[data-fp-del]', f).hidden = !shown;
+  };
+  const take = async file => {
+    if (!file) return;
+    try { st.data = await photoData(file); st.remove = false; draw(); } catch (x) { toast(x.message, true); }
+  };
+  $('[data-fp-pick]', f).onclick = () => $('[data-fp-file]', f).click();
+  $('[data-fp-take]', f).onclick = () => $('[data-fp-cam]', f).click();
+  $('[data-fp-file]', f).onchange = e => take(e.target.files[0]);
+  $('[data-fp-cam]', f).onchange = e => take(e.target.files[0]);
+  $('[data-fp-del]', f).onclick = () => { st.data = null; st.remove = true; draw(); };
+  draw();
+  return st;
+}
+
+/** Stores the photo chosen in the window, or removes the old one; nothing when the photo was left as it was. */
+async function savePhotoField(id, st) {
+  const path = `/api/members/${encodeURIComponent(id)}/photo`;
+  if (st.data) await api(path, { method: 'PUT', body: { image: st.data } });
+  else if (st.remove && st.url) await api(path, { method: 'DELETE' });
+}
 async function editApplication(id, name, then) {
   const a = await api(`/api/members/${encodeURIComponent(id)}/application`);
   modal({
@@ -2074,20 +2111,23 @@ const editors = {
     const m = (await api('/api/members')).find(x => String(x.id) === String(id));
     if (!m) { toast('Member not found', true); return; }
     // the whole membership application form, as when the member was added (the NIN comes from it: the member list does not carry it)
-    const a = await api(`/api/members/${encodeURIComponent(id)}/application`);
+    const [a, photoUrl] = await Promise.all([api(`/api/members/${encodeURIComponent(id)}/application`), imageUrl(`/api/members/${encodeURIComponent(id)}/photo`)]);
+    let photo;
     modal({
       title: `Membership application form · ${m.memberNo}`, submit: 'Save changes', wide: true,
-      body: `<h4 style="margin-top:0">Member</h4>` +
+      body: `<h4 style="margin-top:0">Member</h4><div class="member-form-head"><div class="grow">` +
         `<div class="row2">${inp('memberNo', 'Member no. (CSM/…)', { req: 1, value: m.memberNo })}${inp('fullName', 'Name', { req: 1, value: m.fullName })}</div>` +
         `<div class="row2">${inp('phone', 'Telephone (all mobile lines)', { value: a.phone || '' })}${inp('nationalId', 'NIN (National ID)', { value: a.nationalId || '' })}</div>` +
         `<div class="row2">${inp('employer', 'Place of work (current employer)', { value: a.employer || '' })}${inp('payrollNo', 'Payroll no.', { value: m.payrollNo || '' })}</div>` +
+        `</div>${photoFieldHtml()}</div>` +
         `<h4>Application details</h4>` + appFields(a),
-      onMount: f => appMount(f, a),
+      onMount: f => { appMount(f, a); photo = mountPhotoField(f, photoUrl); },
       onSubmit: async f => {
         const v = fd(f);
         await api(`/api/members/${id}`, { method: 'PUT', body: { memberNo: v.memberNo, fullName: v.fullName, phone: v.phone,
           nationalId: v.nationalId, employer: v.employer, payrollNo: v.payrollNo } });
         await api(`/api/members/${id}/application`, { method: 'PUT', body: appBody(v) });
+        await savePhotoField(id, photo);
         toast('Member and application form updated'); route();
       }
     });
@@ -2403,20 +2443,22 @@ const actions = {
     try { await api(`/api/users/${d.id}/enabled/${d.value}`, { method: 'PUT' }); route(); } catch (e) { toast(e.message, true); }
   },
   addMember() {
-    // the membership application (admission) form in one window: the member record, then the rest of the paper form
+    // the membership application (admission) form in one window: the member record and photo, then the rest of the paper form
+    let photo;
     modal({
       title: 'Membership application form · new member', submit: 'Add member', wide: true,
-      body: `<h4 style="margin-top:0">Member</h4>` +
+      body: `<h4 style="margin-top:0">Member</h4><div class="member-form-head"><div class="grow">` +
         `<div class="row2">${inp('memberNo', 'Member no. (CSM/…)', { req: 1, ph: 'CSM/' })}${inp('fullName', 'Name', { req: 1 })}</div>` +
         `<div class="row2">${inp('phone', 'Telephone (all mobile lines)')}${inp('nationalId', 'NIN (National ID)')}</div>` +
         `<div class="row2">${inp('employer', 'Place of work (current employer)')}${inp('payrollNo', 'Payroll no.')}</div>` +
+        `</div>${photoFieldHtml()}</div>` +
         `<h4>Application details</h4>` + appFields({}),
-      onMount: f => appMount(f, {}),
+      onMount: f => { appMount(f, {}); photo = mountPhotoField(f, null); },
       onSubmit: async f => {
         const v = fd(f);
         const m = await api('/api/members', { method: 'POST', body: { memberNo: v.memberNo, fullName: v.fullName, phone: v.phone,
           nationalId: v.nationalId, employer: v.employer, payrollNo: v.payrollNo } });
-        try { await api(`/api/members/${m.id}/application`, { method: 'PUT', body: appBody(v) }); }
+        try { await api(`/api/members/${m.id}/application`, { method: 'PUT', body: appBody(v) }); await savePhotoField(m.id, photo); }
         catch (x) { toast(`Member added, but the application details were not saved: ${x.message}. Open the member and use Edit application details.`, true); route(); return; }
         toast(`Member added with the application form. Login: username and password are "${m.loginUsername}"` + (m.loginUsername === m.fullName ? '' : ' (the password is the full names)'));
         route();
