@@ -626,14 +626,71 @@ views.members = async el => {
   await load();
 };
 
-views.statement = async (el, id) => {
-  const [s, ml] = await Promise.all([api(`/api/members/${encodeURIComponent(id)}/statement`), api(`/api/member-ledger?memberId=${encodeURIComponent(id)}`)]);
+/* ------------------------------------------------------------------ membership application form */
+// the CPA SACCO membership application form: everything on the paper form, kept with the member and printed filled in to sign
+const RELATIVE_ROW = (p, i, r = {}) => `<div class="rel-row"><span class="muted">${i}.</span>` +
+  inp(`${p}${i}name`, 'Name', { value: r.name || '' }) + inp(`${p}${i}relationship`, 'Relationship', { value: r.relationship || '' }) +
+  inp(`${p}${i}contact`, 'Contact', { value: r.contact || '' }) + `</div>`;
+
+async function editApplication(id, name, then) {
+  const a = await api(`/api/members/${encodeURIComponent(id)}/application`);
+  const rows = (p, list, n) => Array.from({ length: n }, (_, k) => RELATIVE_ROW(p, k + 1, list[k])).join('');
+  const parent = (p, who, r) => `<div class="rel-row"><span class="muted">${who}</span>` + inp(`${p}name`, 'Name', { value: (r && r.name) || '' }) +
+    sel(`${p}alive`, 'Alive / deceased', [['true', 'Alive'], ['false', 'Deceased']], { blank: '—' }) +
+    inp(`${p}contact`, 'Contact', { value: (r && r.contact) || '' }) + `</div>`;
+  modal({
+    title: `Application form · ${name}`, submit: 'Save application', wide: true,
+    body: `<p class="muted" style="margin-top:0">Name, telephone, NIN and place of work are the member's own details (Edit on the member list).</p>` +
+      `<div class="row2">${inp('fmNumber', 'FM Number (Member of ICPAU)', { value: a.fmNumber || '' })}${inp('icpauId', 'ICPAU ID (Not yet ICPAU Member)', { value: a.icpauId || '' })}</div>` +
+      `<div class="row2">${inp('address', 'Postal or residential address', { value: a.address || '' })}${inp('email', 'Preferred email', { type: 'email', value: a.email || '' })}</div>` +
+      `<div class="row2">${inp('dateOfBirth', 'Date of birth', { type: 'date', value: a.dateOfBirth || '' })}${inp('passportNo', 'Passport number', { value: a.passportNo || '' })}</div>` +
+      `<div class="row2">${inp('tin', 'TIN (Tax Identification Number)', { value: a.tin || '' })}` +
+      `${sel('maritalStatus', 'Marital status', [['SINGLE', 'Single'], ['MARRIED', 'Married'], ['OTHER', 'Other']], { blank: '—' })}</div>` +
+      `<div class="row2">${inp('spouseName', 'Spouse name', { value: a.spouseName || '' })}${inp('spouseTel', 'Spouse telephone', { value: a.spouseTel || '' })}</div>` +
+      `<div class="row2">${inp('designation', 'Designation (job position)', { value: a.designation || '' })}${inp('nextOfKin', 'Next of kin (name & tel)', { value: a.nextOfKin || '' })}</div>` +
+      inp('remarks', 'Other remarks (if any)', { value: a.remarks || '' }) +
+      `<h4>Nominated beneficiaries (in case you are gone)</h4>${rows('b', a.beneficiaries || [], 3)}` +
+      `<h4>Biological children</h4>${rows('c', a.children || [], 6)}` +
+      `<h4>Biological parents</h4>${parent('mother', 'Mother', a.mother)}${parent('father', 'Father', a.father)}` +
+      `<h4>Signed and official use</h4>` +
+      `<div class="row2">${inp('applicationDate', 'Date the applicant signed', { type: 'date', value: a.applicationDate || '' })}${inp('checkedOn', 'Date checked', { type: 'date', value: a.checkedOn || '' })}</div>` +
+      `<div class="row2">${inp('checkedBy', 'Checked by (name)', { value: a.checkedBy || '' })}${inp('checkedByDesignation', 'Checked by (designation)', { value: a.checkedByDesignation || '' })}</div>` +
+      `<div class="row2">${inp('approvedBy', 'Approved by (name)', { value: a.approvedBy || '' })}${inp('approvedByDesignation', 'Approved by (designation)', { value: a.approvedByDesignation || '' })}</div>`,
+    onMount: f => {
+      $('select[name=maritalStatus]', f).value = a.maritalStatus || '';
+      $('select[name=motheralive]', f).value = a.mother && a.mother.alive !== null ? String(a.mother.alive) : '';
+      $('select[name=fatheralive]', f).value = a.father && a.father.alive !== null ? String(a.father.alive) : '';
+    },
+    onSubmit: async f => {
+      const v = fd(f);
+      const list = (p, n) => Array.from({ length: n }, (_, k) => ({ name: v[`${p}${k + 1}name`], relationship: v[`${p}${k + 1}relationship`], contact: v[`${p}${k + 1}contact`] }));
+      const parentOf = (p, rel) => ({ name: v[`${p}name`], relationship: rel, contact: v[`${p}contact`], alive: v[`${p}alive`] === '' ? null : v[`${p}alive`] === 'true' });
+      const body = { ...v, dateOfBirth: v.dateOfBirth || null, applicationDate: v.applicationDate || null, checkedOn: v.checkedOn || null,
+        beneficiaries: list('b', 3), children: list('c', 6), mother: parentOf('mother', 'Mother'), father: parentOf('father', 'Father') };
+      await api(`/api/members/${encodeURIComponent(id)}/application`, { method: 'PUT', body });
+      toast('Application details saved');
+      if (then) then();
+    }
+  });
+}
+
+/** The application form, filled in, opened as a PDF in a new tab to print and sign. */
+async function printApplication(id) {
+  const w = window.open('', '_blank');      // opened straight away so the browser does not block it
+  if (!w) { toast('Allow pop-ups for this site to open the PDF', true); return; }
+  w.document.write('<p style="font-family:sans-serif">Preparing the application form…</p>');
+  try { w.location.href = await pdfUrl(`/api/members/${encodeURIComponent(id)}/application/pdf`); }
+  catch (x) { w.close(); toast(x.message, true); }
+}
+
+views.statement = async (el, id) => {  const [s, ml] = await Promise.all([api(`/api/members/${encodeURIComponent(id)}/statement`), api(`/api/member-ledger?memberId=${encodeURIComponent(id)}`)]);
   const m = s.member;
   el.innerHTML =
     `<p><a href="#members">← Back to members</a></p>` +
     `<div class="panel"><div class="member-head"><div class="photo-box" id="photoBox"></div><div class="grow">` +
     `<h3>${esc(m.fullName)} <span class="muted">· ${esc(m.memberNo)}${S.single ? '' : ' · ' + esc(m.branchCode)}</span></h3>` +
     `<div class="kv"><div><span>Phone</span>${esc(m.phone || '—')}</div><div><span>Employer</span>${esc(m.employer || '—')}</div><div><span>Payroll no.</span>${esc(m.payrollNo || '—')}</div><div><span>Last savings date</span>${esc(m.lastSavingsDate || '—')}</div></div></div></div></div>` +
+    `<div class="panel" id="appPanel"></div>` +
     `<div class="cards">${stat('', 'Savings balance', money(s.savingsBalance))}${stat('b2', 'Shares balance', money(s.sharesBalance))}` +
     `${stat('b3', 'Loan outstanding', money(s.loans.reduce((a, l) => a + Number(l.outstanding), 0)))}</div>` +
     `<div class="panel"><h3>Loans</h3>${loanTable(s.loans, false)}</div>` +
@@ -679,6 +736,25 @@ views.statement = async (el, id) => {
     };
   };
   await drawPhoto();
+
+  // the membership application form: what is filled in, edit it (staff), print it to sign
+  const drawApp = async () => {
+    const a = await api(`/api/members/${encodeURIComponent(id)}/application`);
+    const status = { SINGLE: 'Single', MARRIED: 'Married', OTHER: 'Other' }[a.maritalStatus] || '—';
+    const named = [...(a.beneficiaries || [])].map(b => `${esc(b.name || '')}${b.relationship ? ` (${esc(b.relationship)})` : ''}`).join(', ');
+    $('#appPanel').innerHTML = `<div class="toolbar" style="justify-content:space-between"><h3 style="margin:0">Application form</h3><div>` +
+      (isMgr() ? '' : `<button type="button" class="btn small" id="appEdit">Edit application details</button> `) +
+      `<button type="button" class="btn small primary" id="appPrint">Print application form</button></div></div>` +
+      `<div class="kv"><div><span>FM number / ICPAU ID</span>${esc(a.fmNumber || a.icpauId || '—')}</div>` +
+      `<div><span>Email</span>${esc(a.email || '—')}</div>` +
+      `<div><span>Date of birth</span>${esc(a.dateOfBirth || '—')}${a.age != null ? ` <span class="muted">(${a.age} years)</span>` : ''}</div>` +
+      `<div><span>NIN</span>${esc(a.nationalId || '—')}</div><div><span>Marital status</span>${status}</div>` +
+      `<div><span>Designation</span>${esc(a.designation || '—')}</div><div><span>Next of kin</span>${esc(a.nextOfKin || '—')}</div>` +
+      `<div><span>Beneficiaries</span>${named || '—'}</div></div>`;
+    if ($('#appEdit')) $('#appEdit').onclick = () => editApplication(id, m.fullName, () => drawApp().catch(x => toast(x.message, true)));
+    $('#appPrint').onclick = () => printApplication(id);
+  };
+  await drawApp();
 };
 
 /* ------------------------------------------------------------------ loans */
@@ -2315,6 +2391,8 @@ const actions = {
         const m = await api('/api/members', { method: 'POST', body: fd(f) });
         toast(`Member added. Login: username and password are "${m.loginUsername}"` + (m.loginUsername === m.fullName ? '' : ' (the password is the full names)'));
         route();
+        // the rest of the membership application form is filled in next
+        setTimeout(() => editApplication(m.id, m.fullName).catch(x => toast(x.message, true)), 300);
       }
     });
   },

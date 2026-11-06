@@ -32,6 +32,7 @@ public class MemberController {
     private final com.estates.sacco.service.AuditService audit;
     private final com.estates.sacco.service.MemberLoginService logins;
     private final com.estates.sacco.repo.MemberPhotoRepository photos;
+    private final com.estates.sacco.service.MemberApplicationService applications;
 
     @GetMapping
     @Transactional(readOnly = true)
@@ -96,6 +97,35 @@ public class MemberController {
         return MemberDto.of(members.save(m));
     }
 
+    // ---- the membership application form
+    @GetMapping("/{id}/application")
+    @Transactional(readOnly = true)
+    com.estates.sacco.service.MemberApplicationService.Application application(@PathVariable Long id) {
+        return applications.get(ledgerService.requireMember(id));
+    }
+
+    @PutMapping("/{id}/application")
+    @Transactional
+    com.estates.sacco.service.MemberApplicationService.Application saveApplication(@PathVariable Long id,
+            @RequestBody com.estates.sacco.service.MemberApplicationService.Application req) {
+        Member m = ledgerService.requireMember(id);
+        applications.save(m, req);
+        audit.log(m.getBranch(), "EDIT", "Member application form", m.getId(), "Application details of " + m.getMemberNo() + " " + m.getFullName());
+        return applications.get(m);
+    }
+
+    /** The form filled in, ready to print and sign. */
+    @GetMapping("/{id}/application/pdf")
+    @Transactional(readOnly = true)
+    org.springframework.http.ResponseEntity<byte[]> applicationPdf(@PathVariable Long id) {
+        Member m = ledgerService.requireMember(id);
+        String name = "application-" + m.getMemberNo().replaceAll("[^A-Za-z0-9-]", "_") + ".pdf";
+        return org.springframework.http.ResponseEntity.ok()
+                .contentType(org.springframework.http.MediaType.APPLICATION_PDF)
+                .header(org.springframework.http.HttpHeaders.CONTENT_DISPOSITION, "inline; filename=\"" + name + "\"")
+                .body(applications.pdf(m));
+    }
+
     /** A member with any transactions or loans cannot be deleted; their history must stay. */
     @DeleteMapping("/{id}")
     @ResponseStatus(HttpStatus.NO_CONTENT)
@@ -108,6 +138,7 @@ public class MemberController {
         audit.log(m.getBranch(), "DELETE", "Member", m.getId(), m.getMemberNo() + " " + m.getFullName());
         logins.remove(m);
         photos.deleteByMemberId(m.getId());
+        applications.remove(m.getId());
         members.delete(m);
     }
 

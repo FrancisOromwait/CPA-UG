@@ -298,3 +298,9 @@ hr.sep { border: 0; border-top: 1px solid var(--line); margin: 6px 0 2px; }
   .main { padding: 16px; }
   .row2, .line { grid-template-columns: 1fr; }
 }
+
+/* membership application form: one line per person (beneficiaries, children, parents) */
+.rel-row { display: grid; grid-template-columns: 64px 2fr 1.3fr 1.5fr; gap: 8px; align-items: end; }
+.rel-row > span { padding-bottom: 10px; }
+.modal h4 { margin: 18px 0 6px; }
+@media (max-width: 640px) { .rel-row { grid-template-columns: 1fr; } .rel-row > span { padding-bottom: 0; } }
