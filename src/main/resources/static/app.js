@@ -632,42 +632,52 @@ const RELATIVE_ROW = (p, i, r = {}) => `<div class="rel-row"><span class="muted"
   inp(`${p}${i}name`, 'Name', { value: r.name || '' }) + inp(`${p}${i}relationship`, 'Relationship', { value: r.relationship || '' }) +
   inp(`${p}${i}contact`, 'Contact', { value: r.contact || '' }) + `</div>`;
 
-async function editApplication(id, name, then) {
-  const a = await api(`/api/members/${encodeURIComponent(id)}/application`);
+/** The application form's own fields (everything on the paper form beyond the member record), filled with {@code a}. */
+function appFields(a = {}) {
   const rows = (p, list, n) => Array.from({ length: n }, (_, k) => RELATIVE_ROW(p, k + 1, list[k])).join('');
   const parent = (p, who, r) => `<div class="rel-row"><span class="muted">${who}</span>` + inp(`${p}name`, 'Name', { value: (r && r.name) || '' }) +
     sel(`${p}alive`, 'Alive / deceased', [['true', 'Alive'], ['false', 'Deceased']], { blank: '—' }) +
     inp(`${p}contact`, 'Contact', { value: (r && r.contact) || '' }) + `</div>`;
+  return `<div class="row2">${inp('fmNumber', 'FM Number (Member of ICPAU)', { value: a.fmNumber || '' })}${inp('icpauId', 'ICPAU ID (Not yet ICPAU Member)', { value: a.icpauId || '' })}</div>` +
+    `<div class="row2">${inp('address', 'Postal or residential address', { value: a.address || '' })}${inp('email', 'Preferred email', { type: 'email', value: a.email || '' })}</div>` +
+    `<div class="row2">${inp('dateOfBirth', 'Date of birth', { type: 'date', value: a.dateOfBirth || '' })}${inp('passportNo', 'Passport number', { value: a.passportNo || '' })}</div>` +
+    `<div class="row2">${inp('tin', 'TIN (Tax Identification Number)', { value: a.tin || '' })}` +
+    `${sel('maritalStatus', 'Marital status', [['SINGLE', 'Single'], ['MARRIED', 'Married'], ['OTHER', 'Other']], { blank: '—' })}</div>` +
+    `<div class="row2">${inp('spouseName', 'Spouse name', { value: a.spouseName || '' })}${inp('spouseTel', 'Spouse telephone', { value: a.spouseTel || '' })}</div>` +
+    `<div class="row2">${inp('designation', 'Designation (job position)', { value: a.designation || '' })}${inp('nextOfKin', 'Next of kin (name & tel)', { value: a.nextOfKin || '' })}</div>` +
+    inp('remarks', 'Other remarks (if any)', { value: a.remarks || '' }) +
+    `<h4>Nominated beneficiaries (in case you are gone)</h4>${rows('b', a.beneficiaries || [], 3)}` +
+    `<h4>Biological children</h4>${rows('c', a.children || [], 6)}` +
+    `<h4>Biological parents</h4>${parent('mother', 'Mother', a.mother)}${parent('father', 'Father', a.father)}` +
+    `<h4>Signed and official use</h4>` +
+    `<div class="row2">${inp('applicationDate', 'Date the applicant signed', { type: 'date', value: a.applicationDate || '' })}${inp('checkedOn', 'Date checked', { type: 'date', value: a.checkedOn || '' })}</div>` +
+    `<div class="row2">${inp('checkedBy', 'Checked by (name)', { value: a.checkedBy || '' })}${inp('checkedByDesignation', 'Checked by (designation)', { value: a.checkedByDesignation || '' })}</div>` +
+    `<div class="row2">${inp('approvedBy', 'Approved by (name)', { value: a.approvedBy || '' })}${inp('approvedByDesignation', 'Approved by (designation)', { value: a.approvedByDesignation || '' })}</div>`;
+}
+
+/** The drop-downs of the application form set to {@code a}'s answers. */
+function appMount(f, a = {}) {
+  $('select[name=maritalStatus]', f).value = a.maritalStatus || '';
+  $('select[name=motheralive]', f).value = a.mother && a.mother.alive != null ? String(a.mother.alive) : '';
+  $('select[name=fatheralive]', f).value = a.father && a.father.alive != null ? String(a.father.alive) : '';
+}
+
+/** What the application form's fields say, as the server takes it. */
+function appBody(v) {
+  const list = (p, n) => Array.from({ length: n }, (_, k) => ({ name: v[`${p}${k + 1}name`], relationship: v[`${p}${k + 1}relationship`], contact: v[`${p}${k + 1}contact`] }));
+  const parentOf = (p, rel) => ({ name: v[`${p}name`], relationship: rel, contact: v[`${p}contact`], alive: v[`${p}alive`] === '' ? null : v[`${p}alive`] === 'true' });
+  return { ...v, dateOfBirth: v.dateOfBirth || null, applicationDate: v.applicationDate || null, checkedOn: v.checkedOn || null,
+    beneficiaries: list('b', 3), children: list('c', 6), mother: parentOf('mother', 'Mother'), father: parentOf('father', 'Father') };
+}
+
+async function editApplication(id, name, then) {
+  const a = await api(`/api/members/${encodeURIComponent(id)}/application`);
   modal({
     title: `Application form · ${name}`, submit: 'Save application', wide: true,
-    body: `<p class="muted" style="margin-top:0">Name, telephone, NIN and place of work are the member's own details (Edit on the member list).</p>` +
-      `<div class="row2">${inp('fmNumber', 'FM Number (Member of ICPAU)', { value: a.fmNumber || '' })}${inp('icpauId', 'ICPAU ID (Not yet ICPAU Member)', { value: a.icpauId || '' })}</div>` +
-      `<div class="row2">${inp('address', 'Postal or residential address', { value: a.address || '' })}${inp('email', 'Preferred email', { type: 'email', value: a.email || '' })}</div>` +
-      `<div class="row2">${inp('dateOfBirth', 'Date of birth', { type: 'date', value: a.dateOfBirth || '' })}${inp('passportNo', 'Passport number', { value: a.passportNo || '' })}</div>` +
-      `<div class="row2">${inp('tin', 'TIN (Tax Identification Number)', { value: a.tin || '' })}` +
-      `${sel('maritalStatus', 'Marital status', [['SINGLE', 'Single'], ['MARRIED', 'Married'], ['OTHER', 'Other']], { blank: '—' })}</div>` +
-      `<div class="row2">${inp('spouseName', 'Spouse name', { value: a.spouseName || '' })}${inp('spouseTel', 'Spouse telephone', { value: a.spouseTel || '' })}</div>` +
-      `<div class="row2">${inp('designation', 'Designation (job position)', { value: a.designation || '' })}${inp('nextOfKin', 'Next of kin (name & tel)', { value: a.nextOfKin || '' })}</div>` +
-      inp('remarks', 'Other remarks (if any)', { value: a.remarks || '' }) +
-      `<h4>Nominated beneficiaries (in case you are gone)</h4>${rows('b', a.beneficiaries || [], 3)}` +
-      `<h4>Biological children</h4>${rows('c', a.children || [], 6)}` +
-      `<h4>Biological parents</h4>${parent('mother', 'Mother', a.mother)}${parent('father', 'Father', a.father)}` +
-      `<h4>Signed and official use</h4>` +
-      `<div class="row2">${inp('applicationDate', 'Date the applicant signed', { type: 'date', value: a.applicationDate || '' })}${inp('checkedOn', 'Date checked', { type: 'date', value: a.checkedOn || '' })}</div>` +
-      `<div class="row2">${inp('checkedBy', 'Checked by (name)', { value: a.checkedBy || '' })}${inp('checkedByDesignation', 'Checked by (designation)', { value: a.checkedByDesignation || '' })}</div>` +
-      `<div class="row2">${inp('approvedBy', 'Approved by (name)', { value: a.approvedBy || '' })}${inp('approvedByDesignation', 'Approved by (designation)', { value: a.approvedByDesignation || '' })}</div>`,
-    onMount: f => {
-      $('select[name=maritalStatus]', f).value = a.maritalStatus || '';
-      $('select[name=motheralive]', f).value = a.mother && a.mother.alive !== null ? String(a.mother.alive) : '';
-      $('select[name=fatheralive]', f).value = a.father && a.father.alive !== null ? String(a.father.alive) : '';
-    },
+    body: `<p class="muted" style="margin-top:0">Name, telephone, NIN and place of work are the member's own details (Edit on the member list).</p>` + appFields(a),
+    onMount: f => appMount(f, a),
     onSubmit: async f => {
-      const v = fd(f);
-      const list = (p, n) => Array.from({ length: n }, (_, k) => ({ name: v[`${p}${k + 1}name`], relationship: v[`${p}${k + 1}relationship`], contact: v[`${p}${k + 1}contact`] }));
-      const parentOf = (p, rel) => ({ name: v[`${p}name`], relationship: rel, contact: v[`${p}contact`], alive: v[`${p}alive`] === '' ? null : v[`${p}alive`] === 'true' });
-      const body = { ...v, dateOfBirth: v.dateOfBirth || null, applicationDate: v.applicationDate || null, checkedOn: v.checkedOn || null,
-        beneficiaries: list('b', 3), children: list('c', 6), mother: parentOf('mother', 'Mother'), father: parentOf('father', 'Father') };
-      await api(`/api/members/${encodeURIComponent(id)}/application`, { method: 'PUT', body });
+      await api(`/api/members/${encodeURIComponent(id)}/application`, { method: 'PUT', body: appBody(fd(f)) });
       toast('Application details saved');
       if (then) then();
     }
@@ -2382,17 +2392,23 @@ const actions = {
     try { await api(`/api/users/${d.id}/enabled/${d.value}`, { method: 'PUT' }); route(); } catch (e) { toast(e.message, true); }
   },
   addMember() {
+    // the membership application (admission) form in one window: the member record, then the rest of the paper form
     modal({
-      title: 'Add member', submit: 'Add member',
-      body: `<div class="row2">${inp('memberNo', 'Member no.', { req: 1 })}${inp('fullName', 'Full name', { req: 1 })}</div>` +
-        `<div class="row2">${inp('phone', 'Phone')}${inp('nationalId', 'National ID')}</div>` +
-        `<div class="row2">${inp('employer', 'Employer')}${inp('payrollNo', 'Payroll no.')}</div>`,
+      title: 'Membership application form · new member', submit: 'Add member', wide: true,
+      body: `<h4 style="margin-top:0">Member</h4>` +
+        `<div class="row2">${inp('memberNo', 'Member no. (CSM/…)', { req: 1, ph: 'CSM/' })}${inp('fullName', 'Name', { req: 1 })}</div>` +
+        `<div class="row2">${inp('phone', 'Telephone (all mobile lines)')}${inp('nationalId', 'NIN (National ID)')}</div>` +
+        `<div class="row2">${inp('employer', 'Place of work (current employer)')}${inp('payrollNo', 'Payroll no.')}</div>` +
+        `<h4>Application details</h4>` + appFields({}),
+      onMount: f => appMount(f, {}),
       onSubmit: async f => {
-        const m = await api('/api/members', { method: 'POST', body: fd(f) });
-        toast(`Member added. Login: username and password are "${m.loginUsername}"` + (m.loginUsername === m.fullName ? '' : ' (the password is the full names)'));
+        const v = fd(f);
+        const m = await api('/api/members', { method: 'POST', body: { memberNo: v.memberNo, fullName: v.fullName, phone: v.phone,
+          nationalId: v.nationalId, employer: v.employer, payrollNo: v.payrollNo } });
+        try { await api(`/api/members/${m.id}/application`, { method: 'PUT', body: appBody(v) }); }
+        catch (x) { toast(`Member added, but the application details were not saved: ${x.message}. Open the member and use Edit application details.`, true); route(); return; }
+        toast(`Member added with the application form. Login: username and password are "${m.loginUsername}"` + (m.loginUsername === m.fullName ? '' : ' (the password is the full names)'));
         route();
-        // the rest of the membership application form is filled in next
-        setTimeout(() => editApplication(m.id, m.fullName).catch(x => toast(x.message, true)), 300);
       }
     });
   },
