@@ -42,6 +42,7 @@ public class PostingService {
     private final LedgerRepository ledger;
     private final LoanScheduleService schedules;
     private final SavingsAccrualService savingsAccrual;
+    private final LoanAccrualService loanAccrual;
 
     private final AccountCodes codes;
 
@@ -60,6 +61,13 @@ public class PostingService {
     public void record(LedgerEntry e) {
         recordLines(e);
         savingsChanged(java.util.Collections.singletonList(SavingsAccrualService.changeOf(e)));
+        loanChanged(java.util.Collections.singletonList(loanAccrual.changeOf(e)));
+    }
+
+    /** Books the loan interest that changes to loans' principal call for (LoanAccrualService), with its ledger lines. */
+    @Transactional
+    public void loanChanged(List<LoanAccrualService.Change> changes) {
+        for (LedgerEntry interest : loanAccrual.apply(changes)) recordLines(interest);
     }
 
     /**
@@ -134,8 +142,16 @@ public class PostingService {
             }
             case LOAN_REPAYMENT -> {
                 // interest that has fallen due is paid first, the rest reduces the loan
-                BigDecimal interestPart = schedules.interestPortionOf(e.getLoan(), e).min(amt);
-                BigDecimal principalPart = amt.subtract(interestPart);
+                BigDecimal interestPart, principalPart;
+                if (loanAccrual.enabled() && e.getLoan() != null) {
+                    // the interest owed before this repayment, then principal; beyond the principal: interest paid in advance
+                    interestPart = loanAccrual.interestOwedBefore(e).min(amt);
+                    principalPart = amt.subtract(interestPart).min(loanAccrual.principalLeftBefore(e));
+                    interestPart = amt.subtract(principalPart);
+                } else {
+                    interestPart = schedules.interestPortionOf(e.getLoan(), e).min(amt);
+                    principalPart = amt.subtract(interestPart);
+                }
                 if (!grouped && cash != null) gl(e, cash, product, desc, amt, BigDecimal.ZERO);
                 if (principalPart.signum() > 0) gl(e, productAccount, product, desc, BigDecimal.ZERO, principalPart);
                 if (interestPart.signum() > 0) {

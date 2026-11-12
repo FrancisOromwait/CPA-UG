@@ -1735,14 +1735,19 @@ views.interest = async el => {
     (isMgr() ? sel('branchId', 'Branch', branches.map(b => [b.id, `${b.code} – ${b.name}`]), { blank: 'All branches' }) : '') +
     inp('month', 'Month', { type: 'month', req: 1, value: defaultMonth }) +
     `<button class="btn primary">View interest</button></form>` +
-    `<p class="muted" style="margin:0">Pick a month and click <strong>View interest</strong> to see each loan's balance and the interest it earned that month: ` +
+    (FEES.accrualRate != null
+      ? `<p class="muted" style="margin:0">Loan interest is <strong>${esc(FEES.accrualRate)}% a year on every loan</strong>, worked out every day on the principal still owed ` +
+        `(the yearly rate ÷ 365), as the old system did. Every <strong>repayment</strong> books the days since the loan's last interest date in its own journal ` +
+        `and pays the interest owed first, then principal. Once a month has ended, its <strong>month end books itself</strong>: the days from each loan's ` +
+        `last interest date to the month end (Dr Interest receivable, Cr Loan interest income). Pick a month to see what its month end books.</p></div>`
+      : `<p class="muted" style="margin:0">Pick a month and click <strong>View interest</strong> to see each loan's balance and the interest it earned that month: ` +
     (FEES.dailyInterest
       ? `the yearly rate ÷ 365 for every day of the month (31 days in January, 28 in a normal February...) on the principal still owed at the end of the month. ` +
         `A loan is charged for the whole month it is paid out in, whatever day that is. `
       : `its monthly rate (yearly rate ÷ 12) on the principal still owed at the end of the month. Days are not counted: a loan paid out on the 1st ` +
         `and one paid out on the 20th are both charged a full month. `) +
     `Nothing is booked until you click <strong>Post interest</strong>, which books ` +
-    `Dr Interest receivable, Cr Loan interest income, and adds the interest to the member's loan.</p></div>` +
+    `Dr Interest receivable, Cr Loan interest income, and adds the interest to the member's loan.</p></div>`) +
     `<div class="panel" id="intOut"></div><div class="panel"><h3>Interest runs already posted</h3><div id="intRuns"></div></div>`;
 
   const loadRuns = async () => {

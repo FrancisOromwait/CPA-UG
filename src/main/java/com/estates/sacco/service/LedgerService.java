@@ -28,6 +28,7 @@ public class LedgerService {
     private final BranchScope scope;
     private final PostingService posting;
     private final LoanScheduleService schedules;
+    private final LoanAccrualService loanAccrual;
     private final LoanAccountingService accounting;
     private final InterestAccrualRepository accruals;
 
@@ -55,6 +56,8 @@ public class LedgerService {
 
     public BigDecimal outstanding(Loan l) {
         if (l.getStatus() != LoanStatus.ACTIVE && l.getStatus() != LoanStatus.CLEARED) return BigDecimal.ZERO;
+        // interest booked as the loan moves: principal still owed, interest owed, and the interest of the days since the last booking
+        if (loanAccrual.enabled()) return loanAccrual.payoff(l);
         // still to be paid in total: the principal plus the interest of every installment (charged where a run has been done, planned otherwise)
         return schedules.contractualTotal(l).subtract(ledger.repaidOnLoan(l.getId()));
     }
@@ -77,6 +80,7 @@ public class LedgerService {
 
     /** What the books show the member owing on a loan: principal paid out (or brought forward) + interest charged - repaid. */
     public BigDecimal bookedOutstanding(Loan l) {
+        if (loanAccrual.enabled()) return loanAccrual.payoff(l).max(BigDecimal.ZERO);
         return ledger.sumByLoan(l.getId(), TxType.LOAN_DISBURSEMENT).add(l.getBroughtForward()).add(ledger.sumByLoan(l.getId(), TxType.LOAN_INTEREST))
                 .subtract(ledger.repaidOnLoan(l.getId())).max(BigDecimal.ZERO);
     }
@@ -159,6 +163,7 @@ public class LedgerService {
 
     /** The earlier loan's interest must be on the books for every month that has ended, or the balance cleared would be too low. */
     private void requireInterestPosted(Loan old, LocalDate day) {
+        if (loanAccrual.enabled()) return;   // interest is booked as the loan moves, up to the payout by the settlement itself
         YearMonth upTo = YearMonth.from(day);
         for (YearMonth m = YearMonth.from(old.getDisbursedOn()); m.isBefore(upTo); m = m.plusMonths(1)) {
             if (!accruals.existsByLoanIdAndMonth(old.getId(), m.toString()) && schedules.monthAccrual(old, m).interest().signum() > 0) {

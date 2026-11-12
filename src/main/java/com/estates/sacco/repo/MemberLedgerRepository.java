@@ -32,6 +32,20 @@ public interface MemberLedgerRepository extends JpaRepository<MemberLedgerLine, 
         """)
     List<Object[]> savingsMovesOf(Long memberId, java.time.LocalDate to);
 
+    /**
+     * Loan interest the old system charged a member and was not paid there (its lines are tied to no loan of this system): what the
+     * first repayment here pays before principal. Up to and including a date.
+     */
+    @org.springframework.data.jpa.repository.Query("""
+        select coalesce(sum(case when le.type = com.estates.sacco.domain.TxType.LOAN_INTEREST then m.debit else -m.credit end), 0)
+        from MemberLedgerLine m join m.ledgerEntry le
+        where m.member.id = :memberId and m.category = com.estates.sacco.domain.ProductCategory.LOAN and le.loan is null
+        and le.type in (com.estates.sacco.domain.TxType.LOAN_INTEREST, com.estates.sacco.domain.TxType.LOAN_INTEREST_PAID,
+                        com.estates.sacco.domain.TxType.LOAN_INTEREST_REVERSAL)
+        and m.postedOn <= :to
+        """)
+    java.math.BigDecimal oldSystemLoanInterestOwed(Long memberId, java.time.LocalDate to);
+
     /** Rows of [memberId, savings interest booked less taken back] in a period: what a month's preview shows as already booked. */
     @org.springframework.data.jpa.repository.Query("""
         select m.member.id, sum(m.credit) - sum(m.debit) from MemberLedgerLine m join m.ledgerEntry le

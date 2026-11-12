@@ -82,4 +82,10 @@ public class Loan {
     /** What the payout of this top-up cleared on the earlier loan (principal still owed plus interest charged). */
     @Column(precision = 15, scale = 2)
     private BigDecimal topUpSettled;
+
+    /**
+     * Interest is booked up to and including this day (LoanAccrualService): each repayment books the days since then on the principal
+     * before it, and month end books the rest. Empty: from the payout (a loan from the old system: from its balance date).
+     */
+    private LocalDate lastInterestDate;
 }

@@ -38,6 +38,7 @@ public class EntryAdminService {
     private final LoanScheduleService schedules;
     private final LoanAccountingService accounting;
     private final InterestRunService interestRuns;
+    private final LoanAccrualService loanAccrual;
     private final AuditService audit;
     private final BranchScope scope;
     private final AccountCodes codes;
@@ -104,6 +105,9 @@ public class EntryAdminService {
         // savings interest follows the change: what was there is taken away, what is there now is added (the same nets to nothing)
         List<SavingsAccrualService.Change> changes = new ArrayList<>();
         for (LedgerEntry p : parts) changes.add(taken(p));
+        // loan interest likewise: the principal a repayment paid is taken away, then what it pays now is added
+        List<LoanAccrualService.Change> loanChanges = new ArrayList<>();
+        for (LedgerEntry p : parts) loanChanges.add(loanTaken(p));
         for (LedgerEntry p : parts) removeLines(p);
         for (LedgerEntry p : parts) {
             if (p.getId().equals(e.getId())) {
@@ -123,8 +127,10 @@ public class EntryAdminService {
         for (LedgerEntry p : parts) {
             posting.recordLines(p);
             changes.add(SavingsAccrualService.changeOf(p));
+            loanChanges.add(loanAccrual.changeOf(p));
         }
         posting.savingsChanged(changes);
+        posting.loanChanged(loanChanges);
         for (LedgerEntry p : parts) if (p.getLoan() != null) schedules.reallocate(p.getLoan());
         checkIntegrity(e.getMember(), e.getLoan());
         audit.log(e.getBranch(), "EDIT", "Transaction", e.getId(), "Was: " + before + " | Now: " + describe(e));
@@ -198,8 +204,10 @@ public class EntryAdminService {
         batch.setReceivingAccount(receiving);
         String ref = "PAYROLL " + period + " " + batch.getEmployer();
         List<SavingsAccrualService.Change> changes = new ArrayList<>();
+        List<LoanAccrualService.Change> loanChanges = new ArrayList<>();
         for (LedgerEntry e : ledger.findByPayrollBatchId(batch.getId())) {
             changes.add(taken(e));
+            loanChanges.add(loanTaken(e));
             removeLines(e);
             e.setReference(ref);
             if (day != null) e.setPostedOn(day);
@@ -207,8 +215,10 @@ public class EntryAdminService {
             ledger.save(e);
             posting.recordLines(e);
             changes.add(SavingsAccrualService.changeOf(e));
+            loanChanges.add(loanAccrual.changeOf(e));
         }
         posting.savingsChanged(changes);   // a new payment date moves the savings interest of every deposit in the batch
+        posting.loanChanged(loanChanges);   // ...and the loan interest of every repayment in it
         batches.save(batch);
         audit.log(batch.getBranch(), "EDIT", "Payroll batch", batch.getId(), "Was: " + before + " | Now: " + describe(batch));
         return batch;
@@ -236,11 +246,19 @@ public class EntryAdminService {
     /** Removes a transaction together with its ledger lines. */
     private void remove(LedgerEntry e) {
         SavingsAccrualService.Change gone = taken(e);
+        LoanAccrualService.Change loanGone = loanTaken(e);
         removeLines(e);
         ledger.unlinkInterest(e.getId());   // the interest booked up to its day was earned on the balance before it: it stays
         ledger.delete(e);
         ledger.flush();
         if (gone != null) posting.savingsChanged(List.of(gone));   // interest it had earned is taken back
+        if (loanGone != null) posting.loanChanged(List.of(loanGone));   // the principal it paid is owed again on the days already booked
+    }
+
+    /** What taking a repayment away does to its loan's principal (null: not a repayment, or loan interest is not booked this way). */
+    private LoanAccrualService.Change loanTaken(LedgerEntry e) {
+        LoanAccrualService.Change c = loanAccrual.changeOf(e);
+        return c == null ? null : c.negate();
     }
 
     /** What taking an entry away does to the member's savings (null: it does not touch savings). */

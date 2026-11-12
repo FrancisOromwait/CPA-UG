@@ -32,6 +32,7 @@ public class LoanController {
     private final com.estates.sacco.repo.MemberLedgerRepository memberLedgerLines;
     private final com.estates.sacco.repo.GeneralLedgerRepository generalLedgerLines;
     private final com.estates.sacco.service.AccountCodes codes;
+    private final com.estates.sacco.service.LoanAccrualService loanAccrual;
 
     @GetMapping
     @Transactional(readOnly = true)
@@ -60,12 +61,15 @@ public class LoanController {
     /** What the loan form starts with: the application fee, the process fee and insurance as a percentage of the loan, and legal charges. */
     public record FeeDefaults(java.math.BigDecimal applicationFee, java.math.BigDecimal processPercent,
                               java.math.BigDecimal insurancePercent, java.math.BigDecimal legalCharges, boolean dailyInterest,
-                              java.math.BigDecimal defaultRate) {}
+                              java.math.BigDecimal defaultRate,
+                              /** Loan interest booked as the loans move, at this one rate for every loan (null: the monthly run). */
+                              java.math.BigDecimal accrualRate) {}
 
     @GetMapping("/fee-defaults")
     FeeDefaults feeDefaults() {
         return new FeeDefaults(settings.getLoanApplicationFee(), settings.getLoanProcessPercent(), settings.getLoanInsurancePercent(),
-                settings.getLoanLegalCharges(), settings.isLoanInterestDaily(), settings.getLoanDefaultRate());
+                settings.getLoanLegalCharges(), settings.isLoanInterestDaily(), settings.getLoanDefaultRate(),
+                loanAccrual.enabled() ? loanAccrual.rate() : null);
     }
 
     @PostMapping("/{id}/reject")
